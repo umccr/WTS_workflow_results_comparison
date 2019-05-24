@@ -63,12 +63,17 @@ lf(run_2)
 ### Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 
 ```{r count_lines, message=FALSE, warning=FALSE}
-#dealing with the count files first (from both runs)
+#compare the count files first (from both runs)
 counts_file_name <- dir(c(run_1, run_2), pattern = ".counts")
 counts_file_name[1] <-  paste(run_1, counts_file_name[1], sep = "/")
 counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
-
 lines_count <- countLines(counts_file_name)
+
+#compare the fusion calls (from both runs)
+fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
+fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
+fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
+lines_fusion <- countLines(fusions_file_name)
 
 ```
 
