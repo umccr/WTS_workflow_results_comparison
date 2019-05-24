@@ -1,0 +1,82 @@
+---
+title: "bcbio Native versus Cromwell results comparison"
+author: "Sehrish Kanwal"
+date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
+output:
+  html_document: 
+    keep_md: true
+params:
+  run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1'
+  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_2'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE) # global setup
+```
+
+### Define functions.
+
+```{r define_functions, comment=NA, message=FALSE, warning=FALSE}
+###list files in a directory
+lf <- function(...) {
+  data.frame(fname = list.files(...)) %>% 
+    knitr::kable(row.names = TRUE)
+}
+
+###count number of lines in a file
+countLines <- function(counts_file_name) {
+  target_file <- data.frame(matrix(ncol = length(counts_file_name), nrow = 0))
+
+  for (i in 1:length(counts_file_name)) {
+    file <- read.table(counts_file_name[i], sep="\t", as.is=TRUE, header=FALSE)
+    target_file <- rbind(target_file, data.frame(counts_file_name[i], nrow(file)))
+  }
+  colnames(target_file) <- c("file", "lines_count")
+  return(target_file)
+}
+
+
+```
+
+### Required packages.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyr)
+library(dplyr)
+library(kableExtra)
+```
+
+
+### Read input. The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
+
+```{r read_data, message=FALSE, warning=FALSE}
+run_1 <-file.path(params$run_1)
+#list files in the first run directory
+lf(run_1)
+
+run_2 <- file.path(params$run_2)
+#list files in the second run directory
+lf(run_2)
+
+```
+
+### Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
+
+```{r count_lines, message=FALSE, warning=FALSE}
+#dealing with the count files first (from both runs)
+counts_file_name <- dir(c(run_1, run_2), pattern = ".counts")
+counts_file_name[1] <-  paste(run_1, counts_file_name[1], sep = "/")
+counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
+
+lines_count <- countLines(counts_file_name)
+
+```
+
+
+
+
+
+
+
+
+
