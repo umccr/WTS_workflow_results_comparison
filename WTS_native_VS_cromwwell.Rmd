@@ -24,15 +24,32 @@ lf <- function(...) {
 }
 
 ###count number of lines in a file
-countLines <- function(counts_file_name) {
+countLines <- function(file_names) {
   target_file <- data.frame(matrix(ncol = length(counts_file_name), nrow = 0))
 
-  for (i in 1:length(counts_file_name)) {
-    file <- read.table(counts_file_name[i], sep="\t", as.is=TRUE, header=FALSE)
-    target_file <- rbind(target_file, data.frame(counts_file_name[i], nrow(file)))
+  for (i in 1:length(file_names)) {
+    file <- read.table(file_names[i], sep="\t", as.is=TRUE, header=FALSE)
+    target_file <- rbind(target_file, data.frame(file_names[i], nrow(file)))
   }
   colnames(target_file) <- c("file", "lines_count")
   return(target_file)
+}
+
+###return different between input files
+diffFiles <- function(file_names) {
+  input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+  input2 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+  
+  #An anti join returns the rows of the first table where it cannot find a match in the second table. 
+  diff1 <- dplyr::anti_join(input1, input2, by = c('geneA.name', 'geneB.name', 'paircount', 'splitcount')) %>%
+    mutate(input_info = 'run1') %>%
+    dplyr::select(input_info, everything())
+  
+  diff2 <- dplyr::anti_join(input2, input1, by = c('geneA.name', 'geneB.name', 'paircount', 'splitcount')) %>%
+    mutate(input_info = 'run2') %>%
+    dplyr::select(input_info, everything())
+  
+  return(rbind(diff1,diff2))
 }
 
 
@@ -44,6 +61,7 @@ countLines <- function(counts_file_name) {
 library(tidyr)
 library(dplyr)
 library(kableExtra)
+library(diffobj)
 ```
 
 
@@ -68,12 +86,14 @@ counts_file_name <- dir(c(run_1, run_2), pattern = ".counts")
 counts_file_name[1] <-  paste(run_1, counts_file_name[1], sep = "/")
 counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 lines_count <- countLines(counts_file_name)
+diff_count <- diffFiles(counts_file_name)
 
 #compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
 fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
 fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
 lines_fusion <- countLines(fusions_file_name)
+diff_fusion <- diffFiles(fusions_file_name)
 
 ```
 
