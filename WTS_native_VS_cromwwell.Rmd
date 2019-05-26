@@ -28,7 +28,12 @@ countLines <- function(file_names) {
   target_file <- data.frame(matrix(ncol = length(counts_file_name), nrow = 0))
 
   for (i in 1:length(file_names)) {
-    file <- read.table(file_names[i], sep="\t", as.is=TRUE, header=FALSE)
+    if (file_ext(file_names[i]) == 'counts') {
+      file <- read.table(file_names[i], sep="\t", as.is=TRUE, header=FALSE)
+    } else {
+      file <- read.table(file_names[i], sep="\t", as.is=TRUE, header=TRUE)
+    }
+    #count lines
     target_file <- rbind(target_file, data.frame(file_names[i], nrow(file)))
   }
   colnames(target_file) <- c("file", "lines_count")
@@ -36,28 +41,35 @@ countLines <- function(file_names) {
 }
 
 ###return different between input files
-diffFiles <- function(file_names) {
+diffFiles <- function(file_names, join_by) {
   input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
-  input2 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+  input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
   
-  #An anti join returns the rows of the first table where it cannot find a match in the second table. 
-  diff1 <- dplyr::anti_join(input1, input2, by = c('geneA.name', 'geneB.name', 'paircount', 'splitcount')) %>%
+  #an anti join returns the rows of the first table where it cannot find a match in the second table. 
+  #also pass a character vector of variables to join by.
+  if (file_ext(file_names[i]) == 'counts') {
+    join_by <- c('V1', 'V2')
+  } else {
+    join_by <-  c('geneA.name', 'geneB.name', 'paircount', 'splitcount')
+  }
+  
+  diff1 <- dplyr::anti_join(input1, input2, by = join_by) %>%
     mutate(input_info = 'run1') %>%
     dplyr::select(input_info, everything())
   
-  diff2 <- dplyr::anti_join(input2, input1, by = c('geneA.name', 'geneB.name', 'paircount', 'splitcount')) %>%
+  diff2 <- dplyr::anti_join(input2, input1, by = join_by) %>%
     mutate(input_info = 'run2') %>%
     dplyr::select(input_info, everything())
   
   return(rbind(diff1,diff2))
 }
 
-
 ```
 
 ### Required packages.
 
 ```{r, message=FALSE, warning=FALSE}
+library(tools)
 library(tidyr)
 library(dplyr)
 library(kableExtra)
@@ -85,15 +97,21 @@ lf(run_2)
 counts_file_name <- dir(c(run_1, run_2), pattern = ".counts")
 counts_file_name[1] <-  paste(run_1, counts_file_name[1], sep = "/")
 counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
+
+#functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
-diff_count <- diffFiles(counts_file_name)
+#function call for finding the differences between count files from both runs
+diff_count <- diffFiles(counts_file_name, join_by)
 
 #compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
 fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
 fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
+
+#functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
-diff_fusion <- diffFiles(fusions_file_name)
+#function call for finding the differences between fusion calls from both runs
+diff_fusion <- diffFiles(fusions_file_name, join_by)
 
 ```
 
