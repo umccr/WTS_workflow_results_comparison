@@ -34,22 +34,25 @@ countLines <- function(file_names) {
       file <- read.table(file_names[i], sep="\t", as.is=TRUE, header=TRUE)
     }
     #count lines
-    target_file <- rbind(target_file, data.frame(file_names[i], nrow(file)))
+    target_file <- rbind(target_file, data.frame(basename(file_names[i]), nrow(file)))
   }
   colnames(target_file) <- c("file", "lines_count")
   return(target_file)
 }
 
 ###return different between input files
-diffFiles <- function(file_names, join_by) {
-  input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
-  input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
-  
-  #an anti join returns the rows of the first table where it cannot find a match in the second table. 
+diffFiles <- function(file_names) {
+  #an anti join returns the rows of the first table where it cannot find a match in the second table.
   #also pass a character vector of variables to join by.
-  if (file_ext(file_names[i]) == 'counts') {
-    join_by <- c('V1', 'V2')
+  if (file_ext(file_names[1]) == 'counts') {
+    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=FALSE)
+    colnames(input1) <- c('gene_id', 'count')
+    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=FALSE)
+    colnames(input2) <- c('gene_id', 'count')
+    join_by <- c('gene_id', 'count')
   } else {
+    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
     join_by <-  c('geneA.name', 'geneB.name', 'paircount', 'splitcount')
   }
   
@@ -77,7 +80,9 @@ library(diffobj)
 ```
 
 
-### Read input. The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
+### Read input. 
+
+####The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
 
 ```{r read_data, message=FALSE, warning=FALSE}
 run_1 <-file.path(params$run_1)
@@ -101,7 +106,7 @@ counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 #functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
 #function call for finding the differences between count files from both runs
-diff_count <- diffFiles(counts_file_name, join_by)
+diff_count <- diffFiles(counts_file_name)
 
 #compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
@@ -111,7 +116,7 @@ fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
 #functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
 #function call for finding the differences between fusion calls from both runs
-diff_fusion <- diffFiles(fusions_file_name, join_by)
+diff_fusion <- diffFiles(fusions_file_name)
 
 ```
 
