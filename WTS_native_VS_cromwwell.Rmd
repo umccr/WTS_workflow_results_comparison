@@ -3,8 +3,13 @@ title: "bcbio Native versus Cromwell results comparison"
 author: "Sehrish Kanwal"
 date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
 output:
-  html_document: 
-    keep_md: true
+  html_document:
+    theme: readable
+    toc: true
+    toc_float: true
+    code_folding: hide
+  rmdformats::material:
+    highlight: kate
 params:
   run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1'
   run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_2'
@@ -14,9 +19,9 @@ params:
 knitr::opts_chunk$set(collapse = TRUE) # global setup
 ```
 
-### Define functions.
 
 ```{r define_functions, comment=NA, message=FALSE, warning=FALSE}
+### Define functions.
 ###list files in a directory
 lf <- function(...) {
   data.frame(fname = list.files(...)) %>% 
@@ -69,9 +74,9 @@ diffFiles <- function(file_names) {
 
 ```
 
-### Required packages.
 
 ```{r, message=FALSE, warning=FALSE}
+### Required packages.
 library(tools)
 library(tidyr)
 library(dplyr)
@@ -80,11 +85,9 @@ library(diffobj)
 ```
 
 
-### Read input. 
-
-####The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
-
 ```{r read_data, message=FALSE, warning=FALSE}
+###Read input. 
+###The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
 run_1 <-file.path(params$run_1)
 #list files in the first run directory
 lf(run_1)
@@ -95,9 +98,9 @@ lf(run_2)
 
 ```
 
-### Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 
 ```{r count_lines, message=FALSE, warning=FALSE}
+###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
 counts_file_name <- dir(c(run_1, run_2), pattern = ".counts")
 counts_file_name[1] <-  paste(run_1, counts_file_name[1], sep = "/")
