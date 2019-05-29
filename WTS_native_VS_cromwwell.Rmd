@@ -55,10 +55,14 @@ diffFiles <- function(file_names) {
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=FALSE)
     colnames(input2) <- c('gene_id', 'count')
     join_by <- c('gene_id', 'count')
-  } else {
+  } else if (file_ext(file_names[1]) == 'tsv'){
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
     join_by <-  c('geneA.name', 'geneB.name', 'paircount', 'splitcount')
+  } else {
+    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
+    join_by <-  c('target_id', 'est_counts', 'tpm')
   }
   
   diff1 <- dplyr::anti_join(input1, input2, by = join_by) %>%
@@ -84,7 +88,7 @@ library(kableExtra)
 library(diffobj)
 ```
 
-
+###List files 
 ```{r read_data, message=FALSE, warning=FALSE}
 ###Read input. 
 ###The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
@@ -98,7 +102,7 @@ lf(run_2)
 
 ```
 
-
+###Counts
 ```{r count_lines, message=FALSE, warning=FALSE}
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
@@ -108,9 +112,30 @@ counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
+print(lines_count)
 #function call for finding the differences between count files from both runs
 diff_count <- diffFiles(counts_file_name)
+print(diff_count)
+```
 
+###Abundance
+
+```{r abundance, message=FALSE, warning=FALASE}
+#compare the kallisto abundance calls (from both runs)
+abundance_file_name <- dir(c(run_1, run_2), pattern = ".tsv")
+abundance_file_name[1] <-  paste(run_1, abundance_file_name[1], sep = "/")
+abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
+
+#functionc call for calculating number of lines in fusion files form both runs
+lines_abundance <- countLines(abundance_file_name)
+#function call for finding the differences between fusion calls from both runs
+diff_abundance <- diffFiles(abundance_file_name)
+```
+
+
+###Fusions
+
+```{r count_lines, message=FALSE, warning=FALSE}
 #compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
 fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
@@ -122,9 +147,6 @@ lines_fusion <- countLines(fusions_file_name)
 diff_fusion <- diffFiles(fusions_file_name)
 
 ```
-
-
-
 
 
 
