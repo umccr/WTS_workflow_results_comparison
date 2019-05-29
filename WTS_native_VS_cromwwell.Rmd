@@ -63,8 +63,10 @@ diffFiles <- function(file_names) {
     join_by <-  c('geneA.name', 'geneB.name', 'paircount', 'splitcount')
   } else if (stringr::str_detect(file_names[1], pattern = 'abundance.tsv$')){
     
-    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
-    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
+    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE) %>%
+      mutate(round(est_counts, digits = 2), round(tpm, digits=2))
+    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE) %>%
+      mutate(round(est_counts, digits = 2), round(tpm, digits=2))
     join_by <-  c('target_id', 'est_counts', 'tpm')
   }
   
@@ -117,10 +119,10 @@ counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
-datatable(lines_count)
+datatable(lines_count, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 #function call for finding the differences between count files from both runs
 diff_count <- diffFiles(counts_file_name)
-datatable(diff_count)
+datatable(diff_count, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
 **Abundance**
@@ -134,10 +136,10 @@ abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in fusion files form both runs
 lines_abundance <- countLines(abundance_file_name)
-datatable(lines_abundance)
+datatable(lines_abundance, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 #function call for finding the differences between fusion calls from both runs
 diff_abundance <- diffFiles(abundance_file_name)
-datatable(diff_abundance)
+datatable(diff_abundance, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
 **Fusions**
@@ -150,10 +152,10 @@ fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
-datatable(lines_fusion)
+datatable(lines_fusion, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 #function call for finding the differences between fusion calls from both runs
 diff_fusion <- diffFiles(fusions_file_name)
-datatable(diff_fusion)
+datatable(diff_fusion, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
 
