@@ -49,17 +49,20 @@ countLines <- function(file_names) {
 diffFiles <- function(file_names) {
   #an anti join returns the rows of the first table where it cannot find a match in the second table.
   #also pass a character vector of variables to join by.
-  if (file_ext(file_names[1]) == 'counts') {
+  if (stringr::str_detect(file_names[1], pattern = 'counts$')) {
+    
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=FALSE)
     colnames(input1) <- c('gene_id', 'count')
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=FALSE)
     colnames(input2) <- c('gene_id', 'count')
     join_by <- c('gene_id', 'count')
-  } else if (file_ext(file_names[1]) == 'tsv'){
+  } else if (stringr::str_detect(file_names[1], pattern = 'flat.tsv$')){
+    
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
     join_by <-  c('geneA.name', 'geneB.name', 'paircount', 'splitcount')
-  } else {
+  } else if (stringr::str_detect(file_names[1], pattern = 'abundance.tsv$')){
+    
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
     join_by <-  c('target_id', 'est_counts', 'tpm')
@@ -82,13 +85,14 @@ diffFiles <- function(file_names) {
 ```{r, message=FALSE, warning=FALSE}
 ### Required packages.
 library(tools)
-library(tidyr)
+library(DT)
 library(dplyr)
 library(kableExtra)
 library(diffobj)
 ```
 
-###List files 
+**List files**
+
 ```{r read_data, message=FALSE, warning=FALSE}
 ###Read input. 
 ###The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
@@ -102,7 +106,8 @@ lf(run_2)
 
 ```
 
-###Counts
+**Counts**
+
 ```{r count_lines, message=FALSE, warning=FALSE}
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
@@ -112,30 +117,32 @@ counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
-print(lines_count)
+datatable(lines_count)
 #function call for finding the differences between count files from both runs
 diff_count <- diffFiles(counts_file_name)
-print(diff_count)
+datatable(diff_count)
 ```
 
-###Abundance
+**Abundance**
 
-```{r abundance, message=FALSE, warning=FALASE}
+
+```{r abundance, message=FALSE, warning=FALSE}
 #compare the kallisto abundance calls (from both runs)
-abundance_file_name <- dir(c(run_1, run_2), pattern = ".tsv")
+abundance_file_name <- dir(c(run_1, run_2), pattern = "abundance.tsv")
 abundance_file_name[1] <-  paste(run_1, abundance_file_name[1], sep = "/")
 abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in fusion files form both runs
 lines_abundance <- countLines(abundance_file_name)
+datatable(lines_abundance)
 #function call for finding the differences between fusion calls from both runs
 diff_abundance <- diffFiles(abundance_file_name)
+datatable(diff_abundance)
 ```
 
+**Fusions**
 
-###Fusions
-
-```{r count_lines, message=FALSE, warning=FALSE}
+```{r fusions, message=FALSE, warning=FALSE}
 #compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
 fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
@@ -143,9 +150,10 @@ fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
 
 #functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
+datatable(lines_fusion)
 #function call for finding the differences between fusion calls from both runs
 diff_fusion <- diffFiles(fusions_file_name)
-
+datatable(diff_fusion)
 ```
 
 
