@@ -15,6 +15,20 @@ params:
   run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_2'
 ---
 
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+For each output type (e.g. counts, abundances, fusions), the document currently reports:
+
+- File names in the input (parms) directories
+- The number of entries/lines
+- The difference between both outputs in a tabular format
+
+</div>
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(collapse = TRUE) # global setup
 ```
@@ -64,9 +78,9 @@ diffFiles <- function(file_names) {
   } else if (stringr::str_detect(file_names[1], pattern = 'abundance.tsv$')){
     
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE) %>%
-      mutate(round(est_counts, digits = 2), round(tpm, digits=2))
+      mutate_at(4:5, floor)
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE) %>%
-      mutate(round(est_counts, digits = 2), round(tpm, digits=2))
+      mutate_at(4:5, floor)
     join_by <-  c('target_id', 'est_counts', 'tpm')
   }
   
@@ -93,7 +107,11 @@ library(kableExtra)
 library(diffobj)
 ```
 
-**List files**
+***
+
+# List files
+
+This section lists the file names for outputs in the run directories being compared in this report. 
 
 ```{r read_data, message=FALSE, warning=FALSE}
 ###Read input. 
@@ -108,58 +126,96 @@ lf(run_2)
 
 ```
 
-**Counts**
+***
 
-```{r count_lines, message=FALSE, warning=FALSE}
+# Count
+
+This section includes a summary of the total number of counts in the compared files and a table outlining difference between both runs.
+
+```{r input-counts, message=FALSE, warning=FALSE}
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
 counts_file_name <- dir(c(run_1, run_2), pattern = ".counts")
 counts_file_name[1] <-  paste(run_1, counts_file_name[1], sep = "/")
 counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
+```
 
+### Total counts
+
+```{r total-counts, message=FALSE, warning=FALSE}
 #functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
-datatable(lines_count, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+datatable(lines_count, rownames = FALSE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+```
+
+### Diff counts
+
+```{r diff-counts, message=FALSE, warning=FALSE}
 #function call for finding the differences between count files from both runs
 diff_count <- diffFiles(counts_file_name)
 datatable(diff_count, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
-**Abundance**
+***
 
+# Abundance
 
-```{r abundance, message=FALSE, warning=FALSE}
+This section includes a summary of the total number of abundance entries in the compared files and a table outlining difference between both runs.
+
+```{r input-abundance, message=FALSE, warning=FALSE}
 #compare the kallisto abundance calls (from both runs)
 abundance_file_name <- dir(c(run_1, run_2), pattern = "abundance.tsv")
 abundance_file_name[1] <-  paste(run_1, abundance_file_name[1], sep = "/")
 abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
+```
 
+### Total abundance
+
+```{r total-abundance, message=FALSE, warning=FALSE}
 #functionc call for calculating number of lines in fusion files form both runs
 lines_abundance <- countLines(abundance_file_name)
-datatable(lines_abundance, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+datatable(lines_abundance, rownames = FALSE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+```
+
+### Diff abundance
+
+```{r diff-abundance, message=FALSE, warning=FALSE}
 #function call for finding the differences between fusion calls from both runs
 diff_abundance <- diffFiles(abundance_file_name)
 datatable(diff_abundance, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
-**Fusions**
+***
 
-```{r fusions, message=FALSE, warning=FALSE}
+# Fusions
+
+This section includes a summary of the total number of fusions in the compared files and a table outlining difference between both runs.
+
+```{r input-fusions, message=FALSE, warning=FALSE}
 #compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
 fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
 fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
+```
 
+### Total fusions
+
+```{r total-fusions, message=FALSE, warning=FALSE}
 #functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
-datatable(lines_fusion, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+datatable(lines_fusion, rownames = FALSE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+```
+
+### Diff fusions
+
+```{r diff-fusions, message=FALSE, warning=FALSE}
 #function call for finding the differences between fusion calls from both runs
 diff_fusion <- diffFiles(fusions_file_name)
 datatable(diff_fusion, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
 
-
+***
 
 
 
