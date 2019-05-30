@@ -13,7 +13,7 @@ output:
     highlight: kate
 params:
   run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1'
-  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_2'
+  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_cromwell/run_1'
 ---
 
 <style>
@@ -95,11 +95,11 @@ diffFiles <- function(file_names) {
   }
   
   diff1 <- dplyr::anti_join(input1, input2, by = join_by) %>%
-    mutate(input_info = 'run1') %>%
+    mutate(input_info = 'bcbio_native') %>%
     dplyr::select(input_info, everything())
   
   diff2 <- dplyr::anti_join(input2, input1, by = join_by) %>%
-    mutate(input_info = 'run2') %>%
+    mutate(input_info = 'bcbio_cromwell') %>%
     dplyr::select(input_info, everything())
   
   return(rbind(diff1,diff2))
