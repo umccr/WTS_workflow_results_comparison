@@ -4,6 +4,7 @@ author: "Sehrish Kanwal"
 date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
 output:
   html_document:
+    css: style.css
     theme: readable
     toc: true
     toc_float: true
@@ -77,11 +78,20 @@ diffFiles <- function(file_names) {
     join_by <-  c('geneA.name', 'geneB.name', 'paircount', 'splitcount')
   } else if (stringr::str_detect(file_names[1], pattern = 'abundance.tsv$')){
     
-    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE) %>%
-      mutate_at(4:5, floor)
-    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE) %>%
-      mutate_at(4:5, floor)
-    join_by <-  c('target_id', 'est_counts', 'tpm')
+    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
+    #merge both dataframes on target_id but only keep est_counts from second dataframe (and all cols from first dataframe)
+    icombined <- merge(x = input1, y = input2[,c(1,4)], by = "target_id", all.x = TRUE)
+    icombined_filterd <- data.frame(matrix(ncol = 6, nrow = 0))
+    colnames(icombined_filterd) <- c('target_id',	'length',	'eff_length',	'est_counts_run1',	'tpm', 'est_counts_run2')
+    for (i in 1:nrow(icombined)) {
+      if (icombined[i,4] - icombined[i,6] > 2 || icombined[i,6] - icombined[i,4] > 2) {
+        icombined_filterd <- rbind(icombined_filterd, icombined[i,])
+      }
+    }
+    colnames(icombined_filterd) <- c('target_id',	'length',	'eff_length',	'est_counts_run1',	'tpm', 'est_counts_run2')
+    icombined_filterd <- icombined_filterd[,c('target_id',	'length',	'eff_length',	'est_counts_run1',	'est_counts_run2', 'tpm')]
+    return(icombined_filterd)
   }
   
   diff1 <- dplyr::anti_join(input1, input2, by = join_by) %>%
@@ -183,6 +193,16 @@ datatable(lines_abundance, rownames = FALSE, options = list(sDom  = '<"top">lrt<
 #function call for finding the differences between fusion calls from both runs
 diff_abundance <- diffFiles(abundance_file_name)
 datatable(diff_abundance, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+
+#read files
+input1 <- read.table(abundance_file_name[1], sep="\t", as.is=TRUE, header=TRUE) %>%
+      mutate_at(4, round, 0)
+input2 <- read.table(abundance_file_name[2], sep="\t", as.is=TRUE, header=TRUE) %>%
+      mutate_at(4, round, 0)
+#check if target_id column have same values in both dataframes
+if (identical(input1[,1], input2[,1])) {
+  
+}
 ```
 
 ***
