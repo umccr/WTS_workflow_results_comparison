@@ -132,13 +132,22 @@ comparePlot <- function(file_names, main_title, plot_mode = "static") {
     icombined_tpm <- merge(x = input1[,c('target_id', 'tpm')], y = input2[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
     colnames(icombined_tpm) <- c('target_id', 'tpm_run1', 'tpm_run2')
 
-  p <- plotly::plot_ly(icombined_tpm, x = ~tpm_run1, y = ~tpm_run2, type = 'scatter', text = icombined_tpm$target_id, width = 00, height = 400) %>%
+  #p <- plotly::plot_ly(icombined_tpm, x = ~tpm_run1, y = ~tpm_run2, type = 'scattergl', text = icombined_tpm$target_id, width = 00, height = 400) %>%
     ##### Add Loess smoothed line
-    plotly::add_lines(x = icombined_tpm$tpm_run1, y = ~fitted(loess(icombined_tpm$tpm_run1 ~ icombined_tpm$tpm_run2)),
-                line = list(color = 'grey'),
-                name = "Loess Smoother", opacity = 0.5, showlegend = TRUE) %>%
-    plotly::layout(title = main_title)
-  
+  #  plotly::add_lines(x = icombined_tpm$tpm_run1, y = ~fitted(loess(icombined_tpm$tpm_run1 ~ icombined_tpm$tpm_run2)),
+  #              line = list(color = 'grey'),
+  #              name = "Loess Smoother", opacity = 0.5, showlegend = TRUE) %>%
+  #  plotly::layout(title = main_title)
+    
+    p <- ggplot(data = icombined_tpm, aes(x = log(tpm_run1), y = log(tpm_run2))) + 
+      geom_point(shape = 16, size = 2, show.legend = FALSE, color="firebrick")
+    p <- ggplotly(p) %>% toWebGL()
+    
+    p_log <- ggplot(data = icombined_tpm, aes(x = tpm_run1, y = tpm_run2)) + 
+      geom_point(shape = 16, size = 2, show.legend = FALSE, color="firebrick")
+    p_log <- ggplotly(p_log) %>% toWebGL()
+    
+    do.call(grid.arrange, c(p, p_log, list(ncol = 2)))
 return( p )
 }
 
@@ -151,7 +160,9 @@ library(tools)
 library(DT)
 library(dplyr)
 library(kableExtra)
-library(diffobj)
+library(ggplot2)
+library(plotly)
+library(gridExtra)
 ```
 
 ***
