@@ -124,6 +124,24 @@ diffFiles <- function(file_names) {
   return(rbind(diff1,diff2))
 }
 
+###generate scatter plot for tpm values across both runs
+comparePlot <- function(file_names, main_title, plot_mode = "static") {
+    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
+    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
+    #merge both dataframes on target_id but only keep tpm from second dataframe i.e. run2 (and target_id and tpms from first dataframe i.e. run1)
+    icombined_tpm <- merge(x = input1[,c('target_id', 'tpm')], y = input2[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
+    colnames(icombined_tpm) <- c('target_id', 'tpm_run1', 'tpm_run2')
+
+  p <- plotly::plot_ly(icombined_tpm, x = ~tpm_run1, y = ~tpm_run2, type = 'scatter', text = icombined_tpm$target_id, width = 00, height = 400) %>%
+    ##### Add Loess smoothed line
+    plotly::add_lines(x = icombined_tpm$tpm_run1, y = ~fitted(loess(icombined_tpm$tpm_run1 ~ icombined_tpm$tpm_run2)),
+                line = list(color = 'grey'),
+                name = "Loess Smoother", opacity = 0.5, showlegend = TRUE) %>%
+    plotly::layout(title = main_title)
+  
+return( p )
+}
+
 ```
 
 
@@ -196,6 +214,8 @@ This section includes a summary of the total number of abundance entries in the 
 abundance_file_name <- dir(c(run_1, run_2), pattern = "abundance.tsv")
 abundance_file_name[1] <-  paste(run_1, abundance_file_name[1], sep = "/")
 abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
+
+comparePlot(file_names = abundance_file_name, main_title = "Trascripts per million (tpm) values across both runs")
 ```
 
 ### Total abundance
