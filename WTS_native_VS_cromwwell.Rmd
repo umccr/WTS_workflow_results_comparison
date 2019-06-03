@@ -16,16 +16,20 @@ params:
   run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_cromwell/run_1'
 ---
 
+# Description
+
 <style>
 div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
 </style>
 <div class = "blue">
 
+**SAMPLE: CCR180072_VPT_WH16**
+
 For each output type (e.g. counts, abundances, fusions), the document currently reports:
 
 - File names in the input (parms) directories
 - The number of entries/lines
-- The difference between both outputs in a tabular format
+- The difference between both outputs (bcbio native VS bcbio cromwell) in a tabular format
 
 </div>
 
@@ -65,7 +69,6 @@ diffFiles <- function(file_names) {
   #an anti join returns the rows of the first table where it cannot find a match in the second table.
   #also pass a character vector of variables to join by.
   if (stringr::str_detect(file_names[1], pattern = 'counts$')) {
-    
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=FALSE)
     colnames(input1) <- c('gene_id', 'count')
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=FALSE)
@@ -80,18 +83,34 @@ diffFiles <- function(file_names) {
     
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
-    #merge both dataframes on target_id but only keep est_counts from second dataframe (and all cols from first dataframe)
+    
+    #merge both dataframes on target_id but only keep est_counts from second dataframe i.e. run2 (and all cols from first dataframe i.e. run1)
     icombined <- merge(x = input1, y = input2[,c(1,4)], by = "target_id", all.x = TRUE)
-    icombined_filterd <- data.frame(matrix(ncol = 6, nrow = 0))
-    colnames(icombined_filterd) <- c('target_id',	'length',	'eff_length',	'est_counts_run1',	'tpm', 'est_counts_run2')
+    icombined_filtered <- data.frame(matrix(ncol = 7, nrow = 0))
+    colnames(icombined_filtered) <- c('target_id',	'length',	'eff_length',	'est_counts_run1',	'tpm', 'est_counts_run2', 'percent_change')
+    #icomb_test <- data.frame(matrix(ncol = 3, nrow = 0))
+    
     for (i in 1:nrow(icombined)) {
-      if (icombined[i,4] - icombined[i,6] > 2 || icombined[i,6] - icombined[i,4] > 2) {
-        icombined_filterd <- rbind(icombined_filterd, icombined[i,])
+      #check for percentage decrease (to avoid negative differences) between estimated count values (https://www.skillsyouneed.com/num/percent-change.html)
+      if(icombined[i,'est_counts.x'] != icombined[i,'est_counts.y']) {
+        if (icombined[i,'est_counts.x'] > icombined[i,'est_counts.y']) {
+        original_number <- icombined[i,'est_counts.x']
+        new_number <- icombined[i,'est_counts.y']
+      } else {
+        original_number <- icombined[i,'est_counts.y']
+        new_number <- icombined[i,'est_counts.x']
+      percent_change <- ((original_number - new_number)/original_number) * 100
+      #icomb_test <- rbind(icomb_test, c(original_number, new_number, percent_change))
+      if ( percent_change > 5) {
+        icombined_filtered <- rbind(icombined_filtered, icombined[i,])
+        icombined_filtered[i, 'percent_change'] <- percent_change
       }
+      }
+      }
+    colnames(icombined_filtered) <- c('target_id',	'length',	'eff_length',	'est_counts_run1',	'tpm', 'est_counts_run2', 'percent_change')
+    icombined_filtered <- icombined_filtered[,c('target_id',	'length',	'eff_length',	'est_counts_run1',	'est_counts_run2', 'percent_change', 'tpm')]
+    return(icombined_filtered)
     }
-    colnames(icombined_filterd) <- c('target_id',	'length',	'eff_length',	'est_counts_run1',	'tpm', 'est_counts_run2')
-    icombined_filterd <- icombined_filterd[,c('target_id',	'length',	'eff_length',	'est_counts_run1',	'est_counts_run2', 'tpm')]
-    return(icombined_filterd)
   }
   
   diff1 <- dplyr::anti_join(input1, input2, by = join_by) %>%
@@ -138,7 +157,7 @@ lf(run_2)
 
 ***
 
-# Count
+# Counts
 
 This section includes a summary of the total number of counts in the compared files and a table outlining difference between both runs.
 
