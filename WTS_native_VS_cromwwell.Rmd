@@ -1,6 +1,6 @@
 ---
 title: "bcbio Native versus Cromwell results comparison"
-author: "Sehrish Kanwal"
+author: "Sehrish Kanwal (UMCCR)"
 date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
 output:
   html_document:
@@ -61,6 +61,7 @@ countLines <- function(file_names) {
     target_file <- rbind(target_file, data.frame(basename(file_names[i]), nrow(file)))
   }
   colnames(target_file) <- c("file", "lines_count")
+  rownames(target_file) <- c("bcbio_native", "bcbio_cromwell")
   return(target_file)
 }
 
@@ -125,21 +126,15 @@ diffFiles <- function(file_names) {
 }
 
 ###generate scatter and violin plot for tpm values across both runs
-comparePlot <- function(file_names, main_title, plot_mode = "static") {
-    input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
-    input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
-    #merge both dataframes on target_id but only keep tpm from second dataframe i.e. run2 (and target_id and tpms from first dataframe i.e. run1)
-    icombined_tpm <- merge(x = input1[,c('target_id', 'tpm')], y = input2[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
-    colnames(icombined_tpm) <- c('target_id', 'tpm_run1', 'tpm_run2')
-
-  p <- plotly::plot_ly(icombined_tpm, x = ~log(tpm_run1), y = ~log(tpm_run2), type = 'scattergl', 
+scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
+  plotly::plot_ly(icombined_tpm, x = ~log(tpm_run1), y = ~log(tpm_run2), type = 'scattergl', 
                        text = icombined_tpm$target_id, width = 00, height = 400,
                                marker = list(size = 10,
                        color = 'rgba(255, 182, 193, .5)',
                        #opacity = 0.5, https://plot.ly/~alex/455/four-ways-to-change-opacity-of-scatter-markers.embed
                        line = list(color = 'rgba(152, 0, 0, .8)',
                                    width = 2))) %>%
-       plotly::layout(title = main_title)
+    plotly::layout(title = main_title)
   
     ##### Add Loess smoothed line - not a good idea for big data as this fitting makes it very slow
   #  plotly::add_lines(x = icombined_tpm$tpm_run1, y = ~fitted(loess(icombined_tpm$tpm_run1 ~ icombined_tpm$tpm_run2)),
@@ -151,15 +146,16 @@ comparePlot <- function(file_names, main_title, plot_mode = "static") {
   #p_log <- ggplotly(p_log) %>% toWebGL()
     
   #cowplot::plot_grid(p, p_log, labels = "AUTO")
+}
   
-  #VIOLIN plot https://plot.ly/r/violin/
-  
-  v <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
-        add_trace(y = ~log(tpm_run1), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_run1', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'run_1') %>%
-        add_trace(y = ~log(tpm_run2), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_run2', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'run_2') %>%
-        layout(yaxis = list(title = "log tpm", zeroline = F))
+violinPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
+  ####VIOLIN plot https://plot.ly/r/violin/
+  plotly::plot_ly(icombined_tpm, type = 'violin') %>%
+    add_trace(y = ~log(tpm_run1), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio_native', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio_native') %>%
+    add_trace(y = ~log(tpm_run2), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio_cromwell', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'bcbio_cromwell') %>%
+    layout(yaxis = list(title = "log tpm", zeroline = F))
 }
 
 ```
@@ -214,7 +210,7 @@ counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 ```{r total-counts, message=FALSE, warning=FALSE}
 #functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
-datatable(lines_count, rownames = FALSE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+datatable(lines_count, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 ```
 
 ### Diff counts
@@ -236,8 +232,14 @@ This section includes a summary of the total number of abundance entries in the 
 abundance_file_name <- dir(c(run_1, run_2), pattern = "abundance.tsv")
 abundance_file_name[1] <-  paste(run_1, abundance_file_name[1], sep = "/")
 abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
-
-comparePlot(file_names = abundance_file_name, main_title = "Trascripts per million (tpm) values across both runs")
+input1 <- read.table(abundance_file_name[1], sep="\t", as.is=TRUE, header=TRUE)
+input2 <- read.table(abundance_file_name[2], sep="\t", as.is=TRUE, header=TRUE)
+#merge both dataframes on target_id but only keep tpm from second dataframe i.e. run2 (and target_id and tpms from first dataframe i.e. run1)
+icombined_tpm <- merge(x = input1[,c('target_id', 'tpm')], y = input2[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
+colnames(icombined_tpm) <- c('target_id', 'tpm_run1', 'tpm_run2')
+#function calls
+scatterPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values across both runs")
+violinPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values across both runs")
 ```
 
 ### Total abundance
@@ -245,7 +247,7 @@ comparePlot(file_names = abundance_file_name, main_title = "Trascripts per milli
 ```{r total-abundance, message=FALSE, warning=FALSE}
 #functionc call for calculating number of lines in fusion files form both runs
 lines_abundance <- countLines(abundance_file_name)
-datatable(lines_abundance, rownames = FALSE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+datatable(lines_abundance, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 ```
 
 ### Diff abundance
@@ -284,7 +286,7 @@ fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
 ```{r total-fusions, message=FALSE, warning=FALSE}
 #functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
-datatable(lines_fusion, rownames = FALSE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+datatable(lines_fusion, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 ```
 
 ### Diff fusions
