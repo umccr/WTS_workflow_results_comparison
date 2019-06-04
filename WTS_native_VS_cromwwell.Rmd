@@ -124,7 +124,7 @@ diffFiles <- function(file_names) {
   return(rbind(diff1,diff2))
 }
 
-###generate scatter plot for tpm values across both runs
+###generate scatter and violin plot for tpm values across both runs
 comparePlot <- function(file_names, main_title, plot_mode = "static") {
     input1 <- read.table(file_names[1], sep="\t", as.is=TRUE, header=TRUE)
     input2 <- read.table(file_names[2], sep="\t", as.is=TRUE, header=TRUE)
@@ -132,23 +132,34 @@ comparePlot <- function(file_names, main_title, plot_mode = "static") {
     icombined_tpm <- merge(x = input1[,c('target_id', 'tpm')], y = input2[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
     colnames(icombined_tpm) <- c('target_id', 'tpm_run1', 'tpm_run2')
 
-  #p <- plotly::plot_ly(icombined_tpm, x = ~tpm_run1, y = ~tpm_run2, type = 'scattergl', text = icombined_tpm$target_id, width = 00, height = 400) %>%
-    ##### Add Loess smoothed line
+  p <- plotly::plot_ly(icombined_tpm, x = ~log(tpm_run1), y = ~log(tpm_run2), type = 'scattergl', 
+                       text = icombined_tpm$target_id, width = 00, height = 400,
+                               marker = list(size = 10,
+                       color = 'rgba(255, 182, 193, .5)',
+                       #opacity = 0.5, https://plot.ly/~alex/455/four-ways-to-change-opacity-of-scatter-markers.embed
+                       line = list(color = 'rgba(152, 0, 0, .8)',
+                                   width = 2))) %>%
+       plotly::layout(title = main_title)
+  
+    ##### Add Loess smoothed line - not a good idea for big data as this fitting makes it very slow
   #  plotly::add_lines(x = icombined_tpm$tpm_run1, y = ~fitted(loess(icombined_tpm$tpm_run1 ~ icombined_tpm$tpm_run2)),
   #              line = list(color = 'grey'),
   #              name = "Loess Smoother", opacity = 0.5, showlegend = TRUE) %>%
-  #  plotly::layout(title = main_title)
     
-    p <- ggplot(data = icombined_tpm, aes(x = log(tpm_run1), y = log(tpm_run2))) + 
-      geom_point(shape = 16, size = 2, show.legend = FALSE, color="firebrick")
-    p <- ggplotly(p) %>% toWebGL()
+  #p_log <- ggplot(data = icombined_tpm, aes(x = log(tpm_run1), y = log(tpm_run2))) + 
+    #geom_point(shape = 16, size = 2, show.legend = FALSE, color="firebrick", alpha = 0.1) 
+  #p_log <- ggplotly(p_log) %>% toWebGL()
     
-    p_log <- ggplot(data = icombined_tpm, aes(x = tpm_run1, y = tpm_run2)) + 
-      geom_point(shape = 16, size = 2, show.legend = FALSE, color="firebrick")
-    p_log <- ggplotly(p_log) %>% toWebGL()
-    
-    do.call(grid.arrange, c(p, p_log, list(ncol = 2)))
-return( p )
+  #cowplot::plot_grid(p, p_log, labels = "AUTO")
+  
+  #VIOLIN plot https://plot.ly/r/violin/
+  
+  v <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
+        add_trace(y = ~log(tpm_run1), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_run1', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'run_1') %>%
+        add_trace(y = ~log(tpm_run2), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_run2', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'run_2') %>%
+        layout(yaxis = list(title = "log tpm", zeroline = F))
 }
 
 ```
