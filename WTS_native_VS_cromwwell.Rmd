@@ -25,11 +25,11 @@ div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
 
 **SAMPLE: CCR180072_VPT_WH16**
 
-For each output type (e.g. counts, abundances, fusions), the document currently reports:
+For each WTS workflow output type (e.g. counts, abundances, fusions), the document currently reports:
 
 - File names in the input (parms) directories
-- The number of entries/lines
-- The difference between both outputs (bcbio native VS bcbio cromwell) in a tabular format
+- The number of calls
+- The key difference between both outputs (e.g. bcbio native VS bcbio cromwell currently) in a tabular format
 
 </div>
 
@@ -65,7 +65,7 @@ countLines <- function(file_names) {
   return(target_file)
 }
 
-###return different between input files
+###return key differences (according to set criteria) between input files
 diffFiles <- function(file_names) {
   #an anti join returns the rows of the first table where it cannot find a match in the second table.
   #also pass a character vector of variables to join by.
@@ -127,7 +127,7 @@ diffFiles <- function(file_names) {
 
 ###generate scatter and violin plot for tpm values across both runs
 scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
-  plotly::plot_ly(icombined_tpm, x = ~log(tpm_run1), y = ~log(tpm_run2), type = 'scattergl', 
+  plotly::plot_ly(icombined_tpm, x = ~log(tpm_run1+0.5), y = ~log(tpm_run2+0.5), type = 'scattergl', 
                        text = icombined_tpm$target_id, width = 00, height = 400,
                                marker = list(size = 10,
                        color = 'rgba(255, 182, 193, .5)',
@@ -136,7 +136,7 @@ scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
                                    width = 2))) %>%
     plotly::layout(title = main_title)
   
-    ##### Add Loess smoothed line - not a good idea for big data as this fitting makes it very slow
+  # Add Loess smoothed line - not a good idea for big data as this fitting makes it very slow
   #  plotly::add_lines(x = icombined_tpm$tpm_run1, y = ~fitted(loess(icombined_tpm$tpm_run1 ~ icombined_tpm$tpm_run2)),
   #              line = list(color = 'grey'),
   #              name = "Loess Smoother", opacity = 0.5, showlegend = TRUE) %>%
@@ -147,15 +147,29 @@ scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
     
   #cowplot::plot_grid(p, p_log, labels = "AUTO")
 }
-  
+
+###VIOLIN plot https://plot.ly/r/violin/
 violinPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
-  ####VIOLIN plot https://plot.ly/r/violin/
-  plotly::plot_ly(icombined_tpm, type = 'violin') %>%
-    add_trace(y = ~log(tpm_run1), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_bcbio_native', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio_native') %>%
-    add_trace(y = ~log(tpm_run2), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_bcbio_cromwell', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'bcbio_cromwell') %>%
+  #overall data distribution
+  p1 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
+    add_trace(y = ~log(tpm_run1+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio_native', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio_native', color = 'orange') %>%
+    add_trace(y = ~log(tpm_run2+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio_cromwell', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'bcbio_cromwell', color = 'green') %>%
     layout(yaxis = list(title = "log tpm", zeroline = F))
+  
+  #zoom into data to highlight data spread
+  p2 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
+    add_trace(y = c(~log(quantile(tpm_run1)[1]+0.5), ~log(quantile(tpm_run1)[3]+0.5)+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio_native', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio_native', color = 'orange') %>%
+    
+    add_trace(y = c(~log(quantile(tpm_run2)[1]+0.5), ~log(quantile(tpm_run2)[3]+0.5)+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio_cromwell', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'bcbio_cromwell', color = 'green') %>%
+    layout(yaxis = list(title = "log tpm", zeroline = F))
+  
+  #combine both box plots
+  subplot(p1, p2, shareX = FALSE, shareY = FALSE, titleY = TRUE, margin = 0.06) %>%
+    hide_legend()
 }
 
 ```
@@ -176,7 +190,7 @@ library(gridExtra)
 
 # List files
 
-This section lists the file names for outputs in the run directories being compared in this report. 
+This section lists the file names for outputs in the run directories being compared in this report.  
 
 ```{r read_data, message=FALSE, warning=FALSE}
 ###Read input. 
@@ -195,7 +209,10 @@ lf(run_2)
 
 # Counts
 
-This section includes a summary of the total number of counts in the compared files and a table outlining difference between both runs.
+This section summarizes two key factors:
+
+- a summary of the total number of counts in the compared files and 
+- a table outlining difference between both runs.
 
 ```{r input-counts, message=FALSE, warning=FALSE}
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
@@ -208,7 +225,7 @@ counts_file_name[2] <-  paste(run_2, counts_file_name[2], sep = "/")
 ### Total counts
 
 ```{r total-counts, message=FALSE, warning=FALSE}
-#functionc call for calculating number of lines in count files from both runs
+###functionc call for calculating number of lines in count files from both runs
 lines_count <- countLines(counts_file_name)
 datatable(lines_count, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 ```
@@ -216,7 +233,7 @@ datatable(lines_count, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bott
 ### Diff counts
 
 ```{r diff-counts, message=FALSE, warning=FALSE}
-#function call for finding the differences between count files from both runs
+###function call for finding the differences between count files from both runs
 diff_count <- diffFiles(counts_file_name)
 datatable(diff_count, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
@@ -225,19 +242,26 @@ datatable(diff_count, rownames = FALSE, filter="top", options = list(pageLength 
 
 # Abundance
 
-This section includes a summary of the total number of abundance entries in the compared files and a table outlining difference between both runs.
+This section summarizes following information:
+
+- a summary of the total number of abundance entries in the compared files and 
+- a table outlining difference between both runs. Percentage difference is calculated against the abundance measurements. 
+  - The set threshold currenly is 5%. Any difference below this percent value is not flagged.
+- Also, included are density plots for tpm (transcripts per million) field in the output, which is not used for calculating %age difference but is important to demonstrate overall data spread.
+  - The first scatter plot compares log transformed tpm values across both runs. This would aid in providing "at a glance" overiew of data divergence (if any).
+  - The violin plots is included as another representation of the same data. The first one is on the whole data (log tpm) values and the second one is focussing on probability density at first and third data quartiles (useful for understanding data range, specially in this case when the data spread is large).
 
 ```{r input-abundance, message=FALSE, warning=FALSE}
-#compare the kallisto abundance calls (from both runs)
+###compare the kallisto abundance calls (from both runs)
 abundance_file_name <- dir(c(run_1, run_2), pattern = "abundance.tsv")
 abundance_file_name[1] <-  paste(run_1, abundance_file_name[1], sep = "/")
 abundance_file_name[2] <-  paste(run_2, abundance_file_name[2], sep = "/")
 input1 <- read.table(abundance_file_name[1], sep="\t", as.is=TRUE, header=TRUE)
 input2 <- read.table(abundance_file_name[2], sep="\t", as.is=TRUE, header=TRUE)
-#merge both dataframes on target_id but only keep tpm from second dataframe i.e. run2 (and target_id and tpms from first dataframe i.e. run1)
+###merge both dataframes on target_id but only keep tpm from second dataframe i.e. run2 (and target_id and tpms from first dataframe i.e. run1)
 icombined_tpm <- merge(x = input1[,c('target_id', 'tpm')], y = input2[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
 colnames(icombined_tpm) <- c('target_id', 'tpm_run1', 'tpm_run2')
-#function calls
+###function calls
 scatterPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values across both runs")
 violinPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values across both runs")
 ```
@@ -245,7 +269,7 @@ violinPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values acro
 ### Total abundance
 
 ```{r total-abundance, message=FALSE, warning=FALSE}
-#functionc call for calculating number of lines in fusion files form both runs
+###functionc call for calculating number of lines in fusion files form both runs
 lines_abundance <- countLines(abundance_file_name)
 datatable(lines_abundance, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 ```
@@ -253,7 +277,7 @@ datatable(lines_abundance, rownames = TRUE, options = list(sDom  = '<"top">lrt<"
 ### Diff abundance
 
 ```{r diff-abundance, message=FALSE, warning=FALSE}
-#function call for finding the differences between fusion calls from both runs
+###function call for finding the differences between fusion calls from both runs
 diff_abundance <- diffFiles(abundance_file_name)
 datatable(diff_abundance, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 
@@ -272,10 +296,14 @@ if (identical(input1[,1], input2[,1])) {
 
 # Fusions
 
-This section includes a summary of the total number of fusions in the compared files and a table outlining difference between both runs.
+This section includes a summary of:
+
+- the total number of fusions in the compared files and 
+- a table outlining difference between both runs.
+  - The fields checked are both fusion genes and pair/split count values (as this information is particularly critical for downstream postprocessing of WTS results).
 
 ```{r input-fusions, message=FALSE, warning=FALSE}
-#compare the fusion calls (from both runs)
+###compare the fusion calls (from both runs)
 fusions_file_name <- dir(c(run_1, run_2), pattern = "flat.tsv")
 fusions_file_name[1] <-  paste(run_1, fusions_file_name[1], sep = "/")
 fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
@@ -284,7 +312,7 @@ fusions_file_name[2] <-  paste(run_2, fusions_file_name[2], sep = "/")
 ### Total fusions
 
 ```{r total-fusions, message=FALSE, warning=FALSE}
-#functionc call for calculating number of lines in fusion files form both runs
+###functionc call for calculating number of lines in fusion files form both runs
 lines_fusion <- countLines(fusions_file_name)
 datatable(lines_fusion, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 ```
@@ -292,7 +320,7 @@ datatable(lines_fusion, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bot
 ### Diff fusions
 
 ```{r diff-fusions, message=FALSE, warning=FALSE}
-#function call for finding the differences between fusion calls from both runs
+###function call for finding the differences between fusion calls from both runs
 diff_fusion <- diffFiles(fusions_file_name)
 datatable(diff_fusion, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
