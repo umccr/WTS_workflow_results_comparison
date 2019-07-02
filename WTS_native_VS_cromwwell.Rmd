@@ -184,6 +184,8 @@ library(kableExtra)
 library(ggplot2)
 library(plotly)
 library(gridExtra)
+library(tximport)
+library(tximportData)
 ```
 
 ***
@@ -292,6 +294,28 @@ if (identical(input1[,1], input2[,1])) {
 }
 ```
 
+### Diff abundance salmon VS featurecounts
+```{r diff2-abundance, message=FALSE, warning=FALSE}
+# Read salmon counts and featurecounts
+salmon <- list.files("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1/salmon/", pattern = "quant.sf", full.names = T)
+featurecounts <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1/CCR180072_VPT_WH16-ready.counts", sep="\t", as.is=TRUE) 
+colnames(featurecounts) <- c("gene", "count")
+
+# Read in the tximport data
+dir <- system.file("extdata", package = "tximportData")
+tx2ensembl <- read.csv(file.path(dir, "tx2gene.ensembl.v87.csv"))
+
+# Look at countsFromAbundance parameter to change the method to generate the counts
+txi.salmon <- tximport(salmon, type = "salmon", tx2gene = tx2ensembl)
+
+# Extract salmon counts to prepare dataframe
+salmon.counts <- as.data.frame(txi.salmon$counts) %>%
+  tibble::rownames_to_column("gene") %>%
+  dplyr::rename(count = V1)
+
+```
+
+
 ***
 
 # Fusions
@@ -324,7 +348,6 @@ datatable(lines_fusion, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bot
 diff_fusion <- diffFiles(fusions_file_name)
 datatable(diff_fusion, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
-
 
 ***
 
