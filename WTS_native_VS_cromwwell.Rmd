@@ -127,7 +127,7 @@ diffFiles <- function(file_names) {
 
 ###generate scatter and violin plot for tpm values across both runs
 scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
-  plotly::plot_ly(icombined_tpm, x = ~log(tpm_run1+0.5), y = ~log(tpm_run2+0.5), type = 'scattergl', 
+  plotly::plot_ly(icombined_tpm, x = ~log2(tpm_run1+0.5), y = ~log2(tpm_run2+0.5), type = 'scattergl', 
                        text = icombined_tpm$target_id, width = 00, height = 400,
                                marker = list(size = 10,
                        color = 'rgba(255, 182, 193, .5)',
@@ -152,11 +152,11 @@ scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
 violinPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
   #overall data distribution
   p1 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
-    add_trace(y = ~log(tpm_run1+0.5), box = list(visible = T),  meanline = list(visible = F),
+    add_trace(y = ~log2(tpm_run1+0.5), box = list(visible = T),  meanline = list(visible = F),
                        x = 'Sample_bcbio_native', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio_native', color = 'orange') %>%
-    add_trace(y = ~log(tpm_run2+0.5), box = list(visible = T),  meanline = list(visible = F),
+    add_trace(y = ~log2(tpm_run2+0.5), box = list(visible = T),  meanline = list(visible = F),
                        x = 'Sample_bcbio_cromwell', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'bcbio_cromwell', color = 'green') %>%
-    layout(yaxis = list(title = "log tpm", zeroline = F))
+    layout(yaxis = list(title = "log2 tpm", zeroline = F))
   
   #zoom into data to highlight data spread
   p2 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
@@ -296,25 +296,39 @@ if (identical(input1[,1], input2[,1])) {
 
 ### Diff abundance salmon VS featurecounts
 ```{r diff2-abundance, message=FALSE, warning=FALSE}
-# Read salmon counts and featurecounts
+####read salmon counts and featurecounts
 salmon <- list.files("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1/salmon/", pattern = "quant.sf", full.names = T)
 featurecounts <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1/CCR180072_VPT_WH16-ready.counts", sep="\t", as.is=TRUE) 
 colnames(featurecounts) <- c("gene", "count")
 
-# Read in the tximport data
+#read in the tximport data
 dir <- system.file("extdata", package = "tximportData")
 tx2ensembl <- read.csv(file.path(dir, "tx2gene.ensembl.v87.csv"))
 
-# Look at countsFromAbundance parameter to change the method to generate the counts
+#look at countsFromAbundance parameter to change the method to generate the counts
 txi.salmon <- tximport(salmon, type = "salmon", tx2gene = tx2ensembl)
 
-# Extract salmon counts to prepare dataframe
+#extract salmon counts to prepare dataframe
 salmon.counts <- as.data.frame(txi.salmon$counts) %>%
   tibble::rownames_to_column("gene") %>%
   dplyr::rename(count = V1)
 
-```
+#merge the calls from featurecounts and salmon
+feature.salmon.counts <- inner_join(featurecounts, salmon.counts, by = "gene") %>%
+  dplyr::mutate(percentage_diff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
+  dplyr::mutate_if(is.numeric, round,2)
+colnames(feature.salmon.counts) <- c("gene", "featurecounts", "salmoncounts", "percentage_diff") 
 
+#counts correlation between featurecounts and salmon
+ggplot(feature.salmon.counts, 
+       aes(x=log2(feature.salmon.counts$featurecounts+1), y=log2(feature.salmon.counts$salmoncounts+1))) +
+         geom_point() +
+         geom_smooth(method = "lm") +
+         geom_abline(slope=1, intercept = 0, color="red") +
+         annotate("text", x=15, y=20, label= "spearman cor = 0.89") +
+         ggtitle("featurecounts versus salmon counts")
+
+```
 
 ***
 
