@@ -186,6 +186,7 @@ library(plotly)
 library(gridExtra)
 library(tximport)
 library(tximportData)
+library(package="EnsDb.Hsapiens.v75", character.only = TRUE)
 ```
 
 ***
@@ -313,13 +314,25 @@ salmon.counts <- as.data.frame(txi.salmon$counts) %>%
   tibble::rownames_to_column("gene") %>%
   dplyr::rename(count = V1)
 
-#merge the calls from featurecounts and salmon
+#merge the calls from featurecounts and salmon - also add a column for recording percentage difference
 feature.salmon.counts <- inner_join(featurecounts, salmon.counts, by = "gene") %>%
   dplyr::mutate(percentage_diff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
   dplyr::mutate_if(is.numeric, round,2)
 colnames(feature.salmon.counts) <- c("gene", "featurecounts", "salmoncounts", "percentage_diff") 
 
-#counts correlation between featurecounts and salmon
+#get genes annotation from ensembl IDs 
+edb <- EnsDb.Hsapiens.v75
+#get keytypes for gene SYMBOL
+keys <- keys(edb, keytype="GENEID")
+#get genes genomic coordiantes
+gene_info <- ensembldb::select(edb, keys=keys, columns=c("GENEID", "GENENAME"), keytype="GENEID")
+colnames(gene_info) <- c("gene", "geneName")
+#remove rows with duplicated ENSEMBL IDs - if any
+gene_info = gene_info[!duplicated(gene_info$gene) | !duplicated(gene_info$geneName),]
+
+
+##### Get genes genomic coordiantes
+gene_info <- ensembldb::select(edb, keys=keys, columns=c("GENEID", "GENEBIOTYPE", "GENENAME", "SEQNAME", "GENESEQSTART", "GENESEQEND"), keytype="GENEID")#counts correlation between featurecounts and salmon
 ggplot(feature.salmon.counts, 
        aes(x=log2(feature.salmon.counts$featurecounts+1), y=log2(feature.salmon.counts$salmoncounts+1))) +
          geom_point() +
