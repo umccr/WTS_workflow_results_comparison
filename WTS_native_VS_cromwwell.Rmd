@@ -329,17 +329,23 @@ gene_info <- ensembldb::select(edb, keys=keys, columns=c("GENEID", "GENENAME"), 
 colnames(gene_info) <- c("gene", "geneName")
 #remove rows with duplicated ENSEMBL IDs - if any
 gene_info = gene_info[!duplicated(gene_info$gene) | !duplicated(gene_info$geneName),]
+#annotate the counts dataframe to include genenames
+feature.salmon.counts.annot <- inner_join(feature.salmon.counts, gene_info, by = "gene") %>%
+  dplyr::arrange(-percentage_diff) %>%
+  dplyr::select(geneName, everything()) %>%
+  #remove part of genenames after .
+  dplyr::mutate(geneName=sapply(strsplit(geneName, split = '.', fixed = TRUE), function(x) (x[1])))
 
-
-##### Get genes genomic coordiantes
-gene_info <- ensembldb::select(edb, keys=keys, columns=c("GENEID", "GENEBIOTYPE", "GENENAME", "SEQNAME", "GENESEQSTART", "GENESEQEND"), keytype="GENEID")#counts correlation between featurecounts and salmon
-ggplot(feature.salmon.counts, 
-       aes(x=log2(feature.salmon.counts$featurecounts+1), y=log2(feature.salmon.counts$salmoncounts+1))) +
+#counts correlation between featurecounts and salmon counts 
+ggplot(feature.salmon.counts.annot, 
+       aes(x=log2(feature.salmon.counts.annot$featurecounts+1), y=log2(feature.salmon.counts.annot$salmoncounts+1))) +
          geom_point() +
          geom_smooth(method = "lm") +
          geom_abline(slope=1, intercept = 0, color="red") +
          annotate("text", x=15, y=20, label= "spearman cor = 0.89") +
          ggtitle("featurecounts versus salmon counts")
+
+
 
 ```
 
