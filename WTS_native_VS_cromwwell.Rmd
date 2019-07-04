@@ -12,8 +12,8 @@ output:
   rmdformats::material:
     highlight: kate
 params:
-  run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1'
-  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_cromwell/run_1'
+  run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_native/run_1/'
+  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_cromwell/run_1'
 ---
 
 # Description
@@ -23,7 +23,7 @@ div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
 </style>
 <div class = "blue">
 
-**SAMPLE: CCR180072_VPT_WH16**
+**SAMPLE: CCR170115b_MH17T002P033_RNA**
 
 For each WTS workflow output type (e.g. counts, abundances, fusions), the document currently reports:
 
@@ -298,8 +298,8 @@ if (identical(input1[,1], input2[,1])) {
 ### Diff abundance salmon VS featurecounts
 ```{r diff2-abundance, message=FALSE, warning=FALSE}
 ####read salmon counts and featurecounts
-salmon <- list.files("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1/salmon/", pattern = "quant.sf", full.names = T)
-featurecounts <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/CCR180072_VPT_WH16/bcbio_native/run_1/CCR180072_VPT_WH16-ready.counts", sep="\t", as.is=TRUE) 
+salmon <- list.files("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_native/run_1/salmon/", pattern = "quant.sf", full.names = T)
+featurecounts <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_native/run_1/X2016_249_17_MH_P033-ready.counts", sep="\t", as.is=TRUE) 
 colnames(featurecounts) <- c("gene", "count")
 
 #read in the tximport data
@@ -316,9 +316,9 @@ salmon.counts <- as.data.frame(txi.salmon$counts) %>%
 
 #merge the calls from featurecounts and salmon - also add a column for recording percentage difference
 feature.salmon.counts <- inner_join(featurecounts, salmon.counts, by = "gene") %>%
-  dplyr::mutate(percentage_diff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
+  dplyr::mutate(percentageDiff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
   dplyr::mutate_if(is.numeric, round,2)
-colnames(feature.salmon.counts) <- c("gene", "featurecounts", "salmoncounts", "percentage_diff") 
+colnames(feature.salmon.counts) <- c("gene", "featurecounts", "salmoncounts", "percentageDiff") 
 
 #get genes annotation from ensembl IDs 
 edb <- EnsDb.Hsapiens.v75
@@ -328,24 +328,46 @@ keys <- keys(edb, keytype="GENEID")
 gene_info <- ensembldb::select(edb, keys=keys, columns=c("GENEID", "GENENAME"), keytype="GENEID")
 colnames(gene_info) <- c("gene", "geneName")
 #remove rows with duplicated ENSEMBL IDs - if any
-gene_info = gene_info[!duplicated(gene_info$gene) | !duplicated(gene_info$geneName),]
+gene_info = gene_info[!duplicated(gene_info$gene),]
+gene_info = gene_info[!duplicated(gene_info$geneName),]
+
 #annotate the counts dataframe to include genenames
-feature.salmon.counts.annot <- inner_join(feature.salmon.counts, gene_info, by = "gene") %>%
-  dplyr::arrange(-percentage_diff) %>%
+counts <- inner_join(feature.salmon.counts, gene_info, by = "gene") %>%
+  dplyr::arrange(-percentageDiff) %>%
   dplyr::select(geneName, everything()) %>%
   #remove part of genenames after .
   dplyr::mutate(geneName=sapply(strsplit(geneName, split = '.', fixed = TRUE), function(x) (x[1])))
 
 #counts correlation between featurecounts and salmon counts 
-ggplot(feature.salmon.counts.annot, 
-       aes(x=log2(feature.salmon.counts.annot$featurecounts+1), y=log2(feature.salmon.counts.annot$salmoncounts+1))) +
+ggplot(counts, 
+       aes(x=log2(counts$featurecounts+1), y=log2(counts$salmoncounts+1))) +
          geom_point() +
          geom_smooth(method = "lm") +
          geom_abline(slope=1, intercept = 0, color="red") +
-         annotate("text", x=15, y=20, label= "spearman cor = 0.89") +
+         annotate("text", x=15, y=20, label= "spearman cor = 0.95") +
          ggtitle("featurecounts versus salmon counts")
 
+#summarize percentage difference between counts
+counts.summary <- summary(counts$percentageDiff)
 
+#Display results only where we have %diff above a certain threshold (using values above third qunartile)
+counts.filtered <- counts %>%
+  dplyr::filter(percentageDiff > quantile(counts$percentageDiff, na.rm = TRUE)[4])
+
+datatable(counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+
+ggplot(counts.filtered, 
+       aes(x=log2(counts.filtered$featurecounts+1), y=log2(counts.filtered$salmoncounts+1))) +
+         geom_point() +
+         geom_abline(slope=1, intercept = 0, color="red") +
+         ggtitle("featurecounts versus salmon counts (filtered)")
+
+# Generate interactive density plot
+plotly::plot_ly(counts.filtered, x = ~log2(featurecounts+1), y = ~log2(salmoncounts+1), type = 'scatter', color = ~percentageDiff, mode= 'markers', 
+                text = ~paste('geneName:', geneName, 
+                              '<br /> featurecounts: ', featurecounts, 
+                              '<br /> salmoncounts: ', salmoncounts),
+                hoverinfo = 'text')
 
 ```
 
