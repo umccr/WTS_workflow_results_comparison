@@ -299,15 +299,18 @@ if (identical(input1[,1], input2[,1])) {
 ```{r diff2-abundance, message=FALSE, warning=FALSE}
 ####read salmon counts and featurecounts
 salmon <- list.files("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_native/run_1/salmon/", pattern = "quant.sf", full.names = T)
+kallisto <- list.files("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_native/run_1/", pattern = "abundance.tsv", full.names = T)
 featurecounts <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/X2016_249_17_MH_P033/bcbio_native/run_1/X2016_249_17_MH_P033-ready.counts", sep="\t", as.is=TRUE) 
 colnames(featurecounts) <- c("gene", "count")
 
 #read in the tximport data
-dir <- system.file("extdata", package = "tximportData")
-tx2ensembl <- read.csv(file.path(dir, "tx2gene.ensembl.v87.csv"))
+dir <- "/Users/kanwals/Documents/UMCCR/data/WTS_comparison"
+tx2ensembl <- read.csv(file.path(dir, "tx2gene.ensembl.v95.csv"), header = FALSE)
+colnames(tx2ensembl) <- c("tx_name", "gene_id")
 
 #look at countsFromAbundance parameter to change the method to generate the counts
 txi.salmon <- tximport(salmon, type = "salmon", tx2gene = tx2ensembl)
+txi.kallisto <- tximport(kallisto, type = "kallisto", tx2gene = tx2ensembl)
 
 #extract salmon counts to prepare dataframe
 salmon.counts <- as.data.frame(txi.salmon$counts) %>%
@@ -350,7 +353,7 @@ ggplot(counts,
 #summarize percentage difference between counts
 counts.summary <- summary(counts$percentageDiff)
 
-#Display results only where we have %diff above a certain threshold (using values above third qunartile)
+#display results only where we have %diff above a certain threshold (using values above third qunartile)
 counts.filtered <- counts %>%
   dplyr::filter(percentageDiff > quantile(counts$percentageDiff, na.rm = TRUE)[4])
 
@@ -362,7 +365,7 @@ ggplot(counts.filtered,
          geom_abline(slope=1, intercept = 0, color="red") +
          ggtitle("featurecounts versus salmon counts (filtered)")
 
-# Generate interactive density plot
+#generate interactive density plot
 plotly::plot_ly(counts.filtered, x = ~log2(featurecounts+1), y = ~log2(salmoncounts+1), type = 'scatter', color = ~percentageDiff, mode= 'markers', 
                 text = ~paste('geneName:', geneName, 
                               '<br /> featurecounts: ', featurecounts, 
