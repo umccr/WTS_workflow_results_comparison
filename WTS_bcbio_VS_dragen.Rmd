@@ -1,0 +1,127 @@
+---
+title: "WTS - bcbio BS dragen results"
+author: "Sehrish Kanwal (UMCCR)"
+date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
+output:
+  html_document:
+    css: style.css
+    theme: readable
+    toc: true
+    toc_float: true
+    code_folding: hide
+  rmdformats::material:
+    highlight: kate
+params:
+  run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/'
+  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/'
+---
+
+# Description
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+
+**SAMPLE: MDX190024_UR3044456_T_rna**
+
+For each WTS workflow output type (abundance and fusions for now), the document currently reports:
+
+- File names in the input (parms) directories
+- The number of calls
+- The key difference between both outputs (i.e. bcbio VS dragen) in a tabular format
+
+</div>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE) # global setup
+```
+
+```{r define_functions, comment=NA, message=FALSE, warning=FALSE}
+### Define functions.
+###list files in a directory
+lf <- function(...) {
+  data.frame(fname = list.files(...)) %>% 
+    knitr::kable(row.names = TRUE)
+}
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+### Required packages.
+library(tools)
+library(DT)
+library(dplyr)
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+library(gridExtra)
+library(package="EnsDb.Hsapiens.v75", character.only = TRUE)
+```
+
+***
+
+# List files
+
+This section lists the file names for outputs in the run directories being compared in this report.  
+
+```{r read_data, message=FALSE, warning=FALSE}
+###Read input. 
+###The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
+run_1 <-file.path(params$run_1)
+#list files in the first run directory
+lf(run_1)
+
+run_2 <- file.path(params$run_2)
+#list files in the second run directory
+lf(run_2)
+
+```
+
+***
+
+# Counts
+
+This section summarizes two key factors:
+
+- a summary of the total number of counts in the compared files and 
+- a table outlining difference between both runs.
+
+```{r input-counts, message=FALSE, warning=FALSE}
+###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
+#compare the count files first (from both runs)
+counts.dragen <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.quant.sf", sep="\t", as.is=TRUE, header=TRUE)
+counts.bcbio <-  read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/abundance.tsv", sep="\t", as.is=TRUE, header=TRUE)
+```
+
+### Total counts
+
+```{r total-counts, message=FALSE, warning=FALSE}
+###functionc call for calculating number of lines in count files from both runs
+lines.count<- data.frame(c("dragen", "bcbio"), c(nrow(counts.dragen), nrow(counts.bcbio)))
+colnames(lines.count) <- c("file", "lines_count")
+datatable(lines.count, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+```
+
+### Diff counts
+
+```{r diff-counts, message=FALSE, warning=FALSE}
+###find the differences between count files from both runs
+#dragen names columns differently. Changing these to reflect bcbio's output format, making the comaprison's easy.
+colnames(counts.dragen) <-  c("target_id", "length", "eff_length", "tpm", "est_counts")
+counts.dragen <- counts.dragen[, c(1, 2, 3, 5, 4)]
+
+##merge the calls from bcbio and dragen - also add a column for recording percentage difference
+dragen.bcbio.counts <- inner_join(counts.bcbio, counts.dragen, by = "target_id") %>%
+  dplyr::mutate(percentageDiff = ifelse(est_counts.x > est_counts.y, (est_counts.x - est_counts.y)/est_counts.x *100, (est_counts.y - est_counts.x)/est_counts.y *100)) %>%
+  dplyr::mutate_if(is.numeric, round,2)
+colnames(dragen.bcbio.counts) <- c("target_id", "length.bcbio", "eff_length.bcbio", "est_counts.bcbio", "tpm.bcbio", "length.dragen", "eff_length.dargen", "est_counts.dragen", "tpm.dragen", "percentage_counts_diff")
+
+```
+
+***
+
+
+
