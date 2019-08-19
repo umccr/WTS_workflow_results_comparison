@@ -1,5 +1,5 @@
 ---
-title: "WTS - bcbio BS dragen results"
+title: "WTS - bcbio VS dragen results"
 author: "Sehrish Kanwal (UMCCR)"
 date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
 output:
@@ -44,6 +44,41 @@ knitr::opts_chunk$set(collapse = TRUE) # global setup
 lf <- function(...) {
   data.frame(fname = list.files(...)) %>% 
     knitr::kable(row.names = TRUE)
+}
+
+###generate scatter and violin plot for tpm values across both runs
+scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
+  plotly::plot_ly(icombined_tpm, x = ~log2(tpm_bcbio+0.5), y = ~log2(tpm_dragen+0.5), type = 'scattergl', 
+                       text = icombined_tpm$target_id, width = 00, height = 400,
+                               marker = list(size = 10,
+                       color = 'rgba(255, 182, 193, .5)',
+                       #opacity = 0.5, https://plot.ly/~alex/455/four-ways-to-change-opacity-of-scatter-markers.embed
+                       line = list(color = 'rgba(152, 0, 0, .8)',
+                                   width = 2))) %>%
+    plotly::layout(title = main_title)
+}
+
+###VIOLIN plot https://plot.ly/r/violin/
+violinPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
+  #overall data distribution
+  p1 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
+    add_trace(y = ~log2(tpm_bcbio+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio', color = 'orange') %>%
+    add_trace(y = ~log2(tpm_dragen+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_dragen', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'dragen', color = 'green') %>%
+    layout(yaxis = list(title = "log2 tpm", zeroline = F))
+  
+  #zoom into data to highlight data spread
+  p2 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
+    add_trace(y = c(~log(quantile(tpm_bcbio)[1]+0.5), ~log(quantile(tpm_bcbio)[3]+0.5)+0.5), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'Sample_bcbio', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio', color = 'orange') %>%
+    add_trace(y = c(~log(quantile(tpm_dragen)[1]+0.5), ~log(quantile(tpm_dragen)[3]+0.5)+0.5), box = list(visible = T),  meanline = list(visible = F),
+              x = 'Sample_dragen', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'dragen', color = 'green') %>%
+    layout(yaxis = list(title = "log tpm", zeroline = F))
+  
+  #combine both box plots
+  subplot(p1, p2, shareX = FALSE, shareY = FALSE, titleY = TRUE, margin = 0.06) %>%
+    hide_legend()
 }
 
 ```
@@ -150,44 +185,68 @@ gene_info = gene_info[!duplicated(gene_info$gene),]
 gene_info = gene_info[!duplicated(gene_info$geneName),]
 
 #annotate the counts dataframe to include genenames
-bcbio.dragen.counts <- inner_join(bcbio.dragen.counts, gene_info, by = "gene") %>%
+bcbio.dragen.gene.counts <- inner_join(bcbio.dragen.counts, gene_info, by = "gene") %>%
   dplyr::arrange(-percentageDiff) %>%
   dplyr::select(geneName, everything()) %>%
   #remove part of genenames after .
   dplyr::mutate(geneName=sapply(strsplit(geneName, split = '.', fixed = TRUE), function(x) (x[1])))
 
 ##merge the raw estimated calls from bcbio and dragen - also add a column for recording percentage difference
-dragen.bcbio.counts <- inner_join(counts.bcbio, counts.dragen, by = "target_id") %>%
+bcbio.dragen.transcript.counts <- inner_join(counts.bcbio, counts.dragen, by = "target_id") %>%
   dplyr::mutate(percentageDiff = ifelse(est_counts.x > est_counts.y, (est_counts.x - est_counts.y)/est_counts.x *100, (est_counts.y - est_counts.x)/est_counts.y *100)) %>%
   dplyr::mutate_if(is.numeric, round,2)
-colnames(dragen.bcbio.counts) <- c("target_id", "length.bcbio", "eff_length.bcbio", "est_counts.bcbio", "tpm.bcbio", "length.dragen", "eff_length.dargen", "est_counts.dragen", "tpm.dragen", "percentage_counts_diff")
+colnames(bcbio.dragen.transcript.counts) <- c("target_id", "length.bcbio", "eff_length.bcbio", "est_counts.bcbio", "tpm.bcbio", "length.dragen", "eff_length.dargen", "est_counts.dragen", "tpm.dragen", "percentage_counts_diff")
 #subset the df to only count values and percentage difference
-est.counts <- dragen.bcbio.counts[, c('target_id', 'est_counts.bcbio', 'est_counts.dragen', 'percentage_counts_diff')]
+est.counts <- bcbio.dragen.transcript.counts[, c('target_id', 'est_counts.bcbio', 'est_counts.dragen', 'percentage_counts_diff')]
 
 #Per transcript counts correlation between bcbio-kallisto and dragen 
-ggplot(counts, 
+ggplot(est.counts, 
        aes(x=log2(est.counts$est_counts.bcbio+1), y=log2(est.counts$est_counts.dragen+1))) +
          geom_point() +
          geom_smooth(method = "lm") +
          geom_abline(slope=1, intercept = 0, color="red") +
          annotate("text", x=15, y=20, label= "spearman cor = 0.79") +
-         ggtitle("featurecounts versus salmon counts")
+         ggtitle("Per transcript counts correlation between bcbio-kallisto and dragen")
 
 #Per gene counts correlation between bcbio-kallisto and dragen 
-ggplot(bcbio.dragen.counts, 
-       aes(x=log2(bcbio.dragen.counts$bcbio+1), y=log2(bcbio.dragen.counts$dragen+1))) +
+ggplot(bcbio.dragen.gene.counts, 
+       aes(x=log2(bcbio.dragen.gene.counts$bcbio+1), y=log2(bcbio.dragen.gene.counts$dragen+1))) +
          geom_point() +
          geom_smooth(method = "lm") +
          geom_abline(slope=1, intercept = 0, color="red") +
          annotate("text", x=15, y=20, label= "spearman cor = 0.99") +
-         ggtitle("Counts correlation between bcbio-kallisto and dragen")
+         ggtitle("Per gene counts correlation between bcbio-kallisto and dragen")
 
 #summarize percentage difference between counts
 transcripts.counts.summary <- summary(est.counts$percentage_counts_diff)
-genes.count.summary <- summary(bcbio.dragen.counts$percentageDiff)
+genes.count.summary <- summary(bcbio.dragen.gene.counts$percentageDiff)
+
+#display results only where we have %diff above a certain threshold (using values above third qunartile) for gene level counts
+bcbio.dragen.gene.counts.filtered <- bcbio.dragen.gene.counts %>%
+  dplyr::filter(percentageDiff > quantile(bcbio.dragen.gene.counts$percentageDiff, na.rm = TRUE)[3])
+
+datatable(bcbio.dragen.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+
+#generate interactive density plot
+plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2(dragen+1), type = 'scatter', color = ~percentageDiff,
+                mode= 'markers',
+                text = ~paste('geneName:', geneName, 
+                              '<br /> bcbioCounts: ', bcbio, 
+                              '<br /> dragenCounts: ', dragen),
+                hoverinfo = 'text')
 
 
+```
 
+### TPMs
+
+```{r tpm-plots, message=FALSE, warning=FALSE}
+###merge both input dataframes on target_id but only keep tpm from second dataframe and target_id and tpms from first dataframe
+icombined_tpm <- merge(x = counts.bcbio[,c('target_id', 'tpm')], y = counts.dragen[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
+colnames(icombined_tpm) <- c('target_id', 'tpm_bcbio', 'tpm_dragen')
+###function calls
+scatterPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values across bcbio and dragen")
+violinPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values across bcbio and dragen runs")
 ```
 
 ***
