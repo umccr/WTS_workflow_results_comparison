@@ -62,19 +62,19 @@ scatterPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
 violinPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
   #overall data distribution
   p1 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
-    add_trace(y = ~log2(tpm_bcbio+0.5), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_bcbio', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio', color = 'orange') %>%
-    add_trace(y = ~log2(tpm_dragen+0.5), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_dragen', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'dragen', color = 'green') %>%
+    add_trace(y = ~log2(tpm_bcbio+1), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'bcbio', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio', color = 'orange') %>%
+    add_trace(y = ~log2(tpm_dragen+1), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'dragen', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'dragen', color = 'green') %>%
     layout(yaxis = list(title = "log2 tpm", zeroline = F))
   
   #zoom into data to highlight data spread
   p2 <- plotly::plot_ly(icombined_tpm, type = 'violin') %>%
-    add_trace(y = c(~log(quantile(tpm_bcbio)[1]+0.5), ~log(quantile(tpm_bcbio)[3]+0.5)+0.5), box = list(visible = T),  meanline = list(visible = F),
-                       x = 'Sample_bcbio', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio', color = 'orange') %>%
-    add_trace(y = c(~log(quantile(tpm_dragen)[1]+0.5), ~log(quantile(tpm_dragen)[3]+0.5)+0.5), box = list(visible = T),  meanline = list(visible = F),
-              x = 'Sample_dragen', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'dragen', color = 'green') %>%
-    layout(yaxis = list(title = "log tpm", zeroline = F))
+    add_trace(y = c(~log2(quantile(tpm_bcbio+1)[1]), ~log2(quantile(tpm_bcbio+1)[4])), box = list(visible = T),  meanline = list(visible = F),
+                       x = 'bcbio', legendgroup = 'run1', text = icombined_tpm$target_id, name = 'bcbio', color = 'orange') %>%
+    add_trace(y = c(~log2(quantile(tpm_dragen+1)[1]), ~log2(quantile(tpm_dragen+1)[4])), box = list(visible = T),  meanline = list(visible = F),
+              x = 'dragen', legendgroup = 'run2', text = icombined_tpm$target_id, name = 'dragen', color = 'green') %>%
+    layout(yaxis = list(title = "log2 tpm", zeroline = F))
   
   #combine both box plots
   subplot(p1, p2, shareX = FALSE, shareY = FALSE, titleY = TRUE, margin = 0.06) %>%
@@ -225,7 +225,7 @@ genes.count.summary <- summary(bcbio.dragen.gene.counts$percentageDiff)
 bcbio.dragen.gene.counts.filtered <- bcbio.dragen.gene.counts %>%
   dplyr::filter(percentageDiff > quantile(bcbio.dragen.gene.counts$percentageDiff, na.rm = TRUE)[3])
 
-datatable(bcbio.dragen.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+datatable(bcbio.dragen.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered gene counts (values above third qunartile)")
 
 #generate interactive density plot
 plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2(dragen+1), type = 'scatter', color = ~percentageDiff,
@@ -233,14 +233,18 @@ plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2
                 text = ~paste('geneName:', geneName, 
                               '<br /> bcbioCounts: ', bcbio, 
                               '<br /> dragenCounts: ', dragen),
-                hoverinfo = 'text')
+                hoverinfo = 'text') %>% 
+  layout(title="Density plot for filtered counts - %age difference above third quantile")
 
 
 ```
 
 ### TPMs
 
-```{r tpm-plots, message=FALSE, warning=FALSE}
+Not showing scatter or violin plots for tpms atm - The initial analysis show the values are failrly comparable.
+Anyway, in the report, we calculate TPMs from gene level count estimates. So the above data should suffice.
+
+```{r tpm-plots, message=FALSE, warning=FALSE, eval = FALSE}
 ###merge both input dataframes on target_id but only keep tpm from second dataframe and target_id and tpms from first dataframe
 icombined_tpm <- merge(x = counts.bcbio[,c('target_id', 'tpm')], y = counts.dragen[,c('target_id','tpm')], by = "target_id", all.x = TRUE)
 colnames(icombined_tpm) <- c('target_id', 'tpm_bcbio', 'tpm_dragen')
