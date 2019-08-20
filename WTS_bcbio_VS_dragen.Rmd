@@ -140,7 +140,7 @@ colnames(tx2ensembl) <- c("tx_name", "gene_id")
 ### Total counts
 
 ```{r total-counts, message=FALSE, warning=FALSE}
-###functionc call for calculating number of lines in count files from both runs
+###calculating number of lines in count files from both runs
 lines.count<- data.frame(c("dragen", "bcbio"), c(nrow(counts.dragen), nrow(counts.bcbio)))
 colnames(lines.count) <- c("file", "lines_count")
 datatable(lines.count, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
@@ -254,6 +254,59 @@ violinPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values acro
 ```
 
 ***
+
+This section includes a summary of:
+
+- the total number of fusions in the compared files and 
+- a table outlining difference between both runs.
+  - The fields checked are fusion gene names.
+  
+```{r input-fusions, message=FALSE, warning=FALSE}
+###compare the fusion calls (from both runs)
+fusions.bcbio <-  read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/UR3044456-flat.tsv", sep="\t", as.is=TRUE, header=TRUE)
+fusions.dragen <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.fusion_candidates.final", sep="\t", as.is=TRUE, header=FALSE)
+colnames(fusions.dragen) <- c("FusionGene", "Score", "LeftBreakpoint", "RightBreakpoint", "ReadNames")
+```
+
+```{r inputs-processing, message=FALSE, warning=FALSE}
+fusions.bcbio.filtered <- fusions.bcbio %>%
+  dplyr::filter(splitcount>1) 
+
+fusions.dragen.processed <- fusions.dragen %>%
+  tidyr::separate(col = FusionGene, into = c("geneA.name", "geneB.name"), sep = "--")
+  
+```
+
+
+# Fusions Analysis
+
+```{r diff-fusions, message=FALSE, warning=FALSE}
+###find common fusion gene pairs between both bcbio-pizzly and dragen. Return all rows from x where there are matching values in y, and all columns from x and y. If there are multiple matches between x and y, all combination of the matches are returned.
+fusions.common <- inner_join(fusions.bcbio.filtered, fusions.dragen.processed)
+
+###find different fusion gene pairs between both bcbio-pizzly and dragen. Return all rows from x where there are not matching values in y, keeping just columns from x.
+fusions.diff.bcbio <- anti_join(fusions.bcbio.filtered, fusions.dragen.processed, by = c("geneA.name", "geneB.name"))
+fusions.diff.dragen <- anti_join(fusions.dragen.processed, fusions.bcbio.filtered, by = c("geneA.name", "geneB.name"))
+
+datatable(fusions.common, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusion gene pairs detected by both bcbio-pizzly and dragen's fusion caller")
+datatable(fusions.diff.bcbio, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by bcbio-pizzly")
+datatable(fusions.diff.dragen, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by dragen's fusion caller")
+```
+
+
+### Fusions Summary
+
+```{r summary-fusions, message=FALSE, warning=FALSE}
+fusions.total <- data.frame(c("bcbio", "dragen"), c(nrow(fusions.bcbio.filtered), nrow(fusions.dragen.processed)))
+colnames(fusions.total) <- c("file", "total_fusions")
+datatable(fusions.total, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+
+fusions.summary <- data.frame(c("Number of common fusion calls", "Number of calls only in bcbio-pizzly", "Number of calls only in dragen's fusion output"),
+                              c(nrow(fusions.common), nrow(fusions.diff.bcbio), nrow(fusions.diff.dragen)))
+colnames(fusions.summary) <- c("metrics", "value")
+datatable(fusions.summary, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+
+```
 
 
 
