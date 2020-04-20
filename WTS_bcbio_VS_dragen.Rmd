@@ -4,6 +4,7 @@ author: "Sehrish Kanwal (UMCCR)"
 date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
 output:
   html_document:
+    keep_md: yes
     css: style.css
     theme: readable
     toc: true
@@ -12,8 +13,8 @@ output:
   rmdformats::material:
     highlight: kate
 params:
-  run_1: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/'
-  run_2: '/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/'
+  run_1: '/Users/kanwals/Documents/UMCCR/data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/'
+  run_2: '/Users/kanwals/Documents/UMCCR/data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/'
 ---
 
 # Description
@@ -28,8 +29,8 @@ div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
 For each WTS workflow output type (abundance and fusions for now), the document currently reports:
 
 - File names in the input (parms) directories
-- The number of calls
-- The key difference between both outputs (i.e. bcbio VS dragen) in a tabular format
+- The number and comparison of calls
+- The key difference between both outputs (i.e. bcbio VS Dragen) in a tabular format
 
 </div>
 
@@ -87,6 +88,7 @@ violinPlot <- function(icombined_tpm, main_title, plot_mode = "static") {
 ```{r, message=FALSE, warning=FALSE}
 ### Required packages.
 library(tools)
+library(here)
 library(DT)
 library(dplyr)
 library(kableExtra)
@@ -128,11 +130,11 @@ This section summarizes two key factors:
 ```{r input-counts, message=FALSE, warning=FALSE}
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
-counts.dragen <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.quant.sf", sep="\t", as.is=TRUE, header=TRUE)
-counts.bcbio <-  read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/abundance.tsv", sep="\t", as.is=TRUE, header=TRUE)
+counts.dragen <- read.table(here("../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.quant.sf"), sep="\t", as.is=TRUE, header=TRUE)
+counts.bcbio <-  read.table(here("../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/abundance.tsv"), sep="\t", as.is=TRUE, header=TRUE)
 
 #read in the tximport data
-dir <- "/Users/kanwals/Documents/UMCCR/data/WTS_comparison"
+dir <- here("../..//data/projects/WTS_comparison")
 tx2ensembl <- read.csv(file.path(dir, "tx2gene.ensembl.v95.csv"), header = FALSE)
 colnames(tx2ensembl) <- c("tx_name", "gene_id")
 ```
@@ -155,8 +157,8 @@ colnames(counts.dragen) <-  c("target_id", "length", "eff_length", "tpm", "est_c
 counts.dragen <- counts.dragen[, c(1, 2, 3, 5, 4)]
 
 #extract gene level counts using tximport
-txi.bcbio <- tximport('/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/abundance.tsv', type = "kallisto", tx2gene = tx2ensembl)
-txi.dragen <- tximport('/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.quant.sf', type = "salmon", tx2gene = tx2ensembl)
+txi.bcbio <- tximport(here('../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/abundance.tsv'), type = "kallisto", tx2gene = tx2ensembl)
+txi.dragen <- tximport(here('../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.quant.sf'), type = "salmon", tx2gene = tx2ensembl)
 
 #extract counts to prepare dataframe
 bcbio.counts <- as.data.frame(txi.bcbio$counts) %>%
@@ -242,7 +244,7 @@ plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2
 ### TPMs
 
 Not showing scatter or violin plots for tpms atm - The initial analysis show the values are failrly comparable.
-Anyway, in the report, we calculate TPMs from gene level count estimates. So the above data should suffice.
+Also, in the report, we calculate TPMs from gene level count estimates. So the above data should suffice.
 
 ```{r tpm-plots, message=FALSE, warning=FALSE, eval = FALSE}
 ###merge both input dataframes on target_id but only keep tpm from second dataframe and target_id and tpms from first dataframe
@@ -255,6 +257,8 @@ violinPlot(icombined_tpm, main_title = "Trascripts per million (tpm) values acro
 
 ***
 
+# Fusions Analysis
+
 This section includes a summary of:
 
 - the total number of fusions in the compared files and 
@@ -263,8 +267,9 @@ This section includes a summary of:
   
 ```{r input-fusions, message=FALSE, warning=FALSE}
 ###compare the fusion calls (from both runs)
-fusions.bcbio <-  read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/UR3044456-flat.tsv", sep="\t", as.is=TRUE, header=TRUE)
-fusions.dragen <- read.table("/Users/kanwals/Documents/UMCCR/data/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.fusion_candidates.final", sep="\t", as.is=TRUE, header=FALSE)
+fusions.bcbio <-  read.table(here("../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/UR3044456-flat.tsv"), sep="\t", as.is=TRUE, header=TRUE)
+fusions.arriba <- read.table(here("../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/bcbio/fusions.tsv"), sep="\t", as.is=TRUE, header=TRUE)
+fusions.dragen <- read.table(here("../../data/projects/WTS_comparison/MDX190024_UR3044456_T_rna/dragen/UR3044456_WTS.fusion_candidates.final"), sep="\t", as.is=TRUE, header=FALSE)
 colnames(fusions.dragen) <- c("FusionGene", "Score", "LeftBreakpoint", "RightBreakpoint", "ReadNames")
 ```
 
@@ -273,40 +278,36 @@ fusions.bcbio.filtered <- fusions.bcbio %>%
   dplyr::filter(splitcount>1) 
 
 fusions.dragen.processed <- fusions.dragen %>%
-  tidyr::separate(col = FusionGene, into = c("geneA.name", "geneB.name"), sep = "--")
+  tidyr::separate(col = FusionGene, into = c("gene1", "gene2"), sep = "--")
   
 ```
 
-
-# Fusions Analysis
-
 ```{r diff-fusions, message=FALSE, warning=FALSE}
-###find common fusion gene pairs between both bcbio-pizzly and dragen. Return all rows from x where there are matching values in y, and all columns from x and y. If there are multiple matches between x and y, all combination of the matches are returned.
-fusions.common <- inner_join(fusions.bcbio.filtered, fusions.dragen.processed)
+###find common fusion gene pairs between both arriba and dragen. Return all rows from x where there are matching values in y, and all columns from x and y. If there are multiple matches between x and y, all combination of the matches are returned.
+fusions.common <- inner_join(fusions.arriba, fusions.dragen.processed)
 
-###find different fusion gene pairs between both bcbio-pizzly and dragen. Return all rows from x where there are not matching values in y, keeping just columns from x.
-fusions.diff.bcbio <- anti_join(fusions.bcbio.filtered, fusions.dragen.processed, by = c("geneA.name", "geneB.name"))
-fusions.diff.dragen <- anti_join(fusions.dragen.processed, fusions.bcbio.filtered, by = c("geneA.name", "geneB.name"))
+###find different fusion gene pairs between both arriba and dragen. Return all rows from x where there are not matching values in y, keeping just columns from x.
+fusions.diff.arriba <- anti_join(fusions.arriba, fusions.dragen.processed, by = c("gene1", "gene2"))
+fusions.diff.dragen <- anti_join(fusions.dragen.processed, fusions.arriba, by = c("gene1", "gene2"))
 
-datatable(fusions.common, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusion gene pairs detected by both bcbio-pizzly and dragen's fusion caller")
-datatable(fusions.diff.bcbio, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by bcbio-pizzly")
-datatable(fusions.diff.dragen, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by dragen's fusion caller")
+datatable(fusions.common, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusion gene pairs detected by both Arriba and Dragen's fusion caller")
+datatable(fusions.diff.arriba, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by Arriba")
+datatable(fusions.diff.dragen, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by Dragen's fusion caller")
 ```
 
 
 ### Fusions Summary
 
 ```{r summary-fusions, message=FALSE, warning=FALSE}
-fusions.total <- data.frame(c("bcbio", "dragen"), c(nrow(fusions.bcbio.filtered), nrow(fusions.dragen.processed)))
+fusions.total <- data.frame(c("Arriba", "Dragen"), c(nrow(fusions.arriba), nrow(fusions.dragen.processed)))
 colnames(fusions.total) <- c("file", "total_fusions")
 datatable(fusions.total, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 
-fusions.summary <- data.frame(c("Number of common fusion calls", "Number of calls only in bcbio-pizzly", "Number of calls only in dragen's fusion output"),
-                              c(nrow(fusions.common), nrow(fusions.diff.bcbio), nrow(fusions.diff.dragen)))
+fusions.summary <- data.frame(c("Number of common fusion calls", "Number of calls only called by Arriba", "Number of calls only called by Dragen's fusion caller"),
+                              c(nrow(fusions.common), nrow(fusions.diff.arriba), nrow(fusions.diff.dragen)))
 colnames(fusions.summary) <- c("metrics", "value")
 datatable(fusions.summary, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
 
 ```
-
 
 
