@@ -235,7 +235,6 @@ bcbio.dragen.gene.counts.filtered <- bcbio.dragen.gene.counts %>%
 datatable(bcbio.dragen.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered gene counts (values above third quantile)")
 
 #generate interactive density plot
-
 plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2(dragen+1), type = 'scatter', color = ~percentageDiff,
                 mode= 'markers',
                 text = ~paste('geneName:', geneName, 
@@ -293,6 +292,7 @@ fusions.dragen.arriba <- read.table(here("../../data/projects/WTS_comparison/SBJ
 colnames(fusions.dragen.arriba) <- c("gene1", "gene2", "strand1(gene/fusion)", "strand2(gene/fusion)", "breakpoint1", "breakpoint2", "site1", "site2", "type", "split_reads1", "split_reads2", "discordant_mates", "coverage1", "coverage2", "confidence", "reading_frame", "tags", "retained_protein_domains", "closest_genomic_breakpoint1", "closest_genomic_breakpoint2", "gene_id1", "gene_id2", "transcript_id1", "transcript_id2", "direction1", "direction2", "filters", "fusion_transcript", "peptide_sequence", "read_identifiers")
 ```
 
+
 ```{r diff-fusions, message=FALSE, warning=FALSE}
 ###find common fusion gene pairs between both arriba and dragen. Return all rows from x where there are matching values in y, and all columns from x and y. If there are multiple matches between x and y, all combination of the matches are returned.
 fusions.common <- inner_join(fusions.bcbio.arriba, fusions.dragen.arriba, by = c("gene1", "gene2"), suffix = c(".bcbio", ".dragen"),)
@@ -300,16 +300,11 @@ fusions.common <- inner_join(fusions.bcbio.arriba, fusions.dragen.arriba, by = c
 ###find different fusion gene pairs between both arriba and dragen. Return all rows from x where there are not matching values in y, keeping just columns from x.
 fusions.diff.bcbio <- anti_join(fusions.bcbio.arriba, fusions.dragen.arriba, by = c("gene1", "gene2"))
 fusions.diff.dragen <- anti_join(fusions.dragen.arriba, fusions.bcbio.arriba, by = c("gene1", "gene2"))
-
-datatable(fusions.common, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusion gene pairs detected by both bcbio-arriba and dragen-arriba")
-datatable(fusions.diff.bcbio, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by bcbio-arriba")
-datatable(fusions.diff.dragen, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by dragen-arriba")
 ```
-
 
 ### Fusions Summary
 
-```{r summary-fusions, message=FALSE, warning=FALSE}
+```{r summary-fusions, message=FALSE, warning=FALSE, echo =FALSE}
 fusions.total <- data.frame(c("bcbio-arriba", "dragen-arriba"), c(nrow(fusions.bcbio.arriba), nrow(fusions.dragen.arriba)))
 colnames(fusions.total) <- c("pipeline", "total_fusions")
 datatable(fusions.total, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
@@ -318,6 +313,10 @@ fusions.summary <- data.frame(c("Number of common fusion calls", "Number of fusi
                               c(nrow(fusions.common), nrow(fusions.diff.bcbio), nrow(fusions.diff.dragen)))
 colnames(fusions.summary) <- c("metrics", "value")
 datatable(fusions.summary, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
+
+datatable(fusions.common, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusion gene pairs detected by both bcbio-arriba and dragen-arriba")
+datatable(fusions.diff.bcbio, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by bcbio-arriba")
+datatable(fusions.diff.dragen, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Fusions only detected by dragen-arriba")
 
 ```
 
