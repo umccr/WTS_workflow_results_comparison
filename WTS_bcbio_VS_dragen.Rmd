@@ -95,7 +95,7 @@ library(ggplot2)
 library(plotly)
 library(gridExtra)
 library(tximport)
-library(package="EnsDb.Hsapiens.v75", character.only = TRUE)
+library(package="EnsDb.Hsapiens.v86", character.only = TRUE)
 ```
 
 ***
@@ -130,6 +130,7 @@ This section summarizes two key factors:
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
 counts.dragen <- read.table(here("../../data/projects/WTS_comparison/SBJ02097/dragen/PRJ221038.quant.sf"), sep="\t", as.is=TRUE, header=TRUE)
+counts.dragen.gene <- read.table(here("../../data/projects/WTS_comparison/SBJ02097/dragen/PRJ221038.quant.genes.sf"), sep="\t", as.is=TRUE, header=TRUE)
 counts.bcbio <-  read.table(here("../../data/projects/WTS_comparison/SBJ02097/bcbio/abundance.tsv"), sep="\t", as.is=TRUE, header=TRUE)
 
 #read in the tximport data
@@ -171,14 +172,25 @@ dragen.counts <- as.data.frame(txi.dragen$counts) %>%
   tibble::rownames_to_column("gene") %>%
   dplyr::rename(count = V1)
 
+dragen.counts.native <- as.data.frame(counts.dragen.gene) %>%
+  dplyr::select(Name, NumReads) %>%
+  dplyr::rename(gene = Name,
+                count= NumReads)
+
 #merge the calls from bcbio and dragen - also add a column for recording percentage difference
 bcbio.dragen.counts <- inner_join(bcbio.counts, dragen.counts, by = "gene") %>%
   dplyr::mutate(percentageDiff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
   dplyr::mutate_if(is.numeric, round,2)
-colnames(bcbio.dragen.counts) <- c("gene", "bcbio", "dragen", "percentageDiff") 
+colnames(bcbio.dragen.counts) <- c("gene", "bcbio", "dragen", "percentageDiff")
+
+#merge the calls from bcbio and dragen native gene count estimation - also add a column for recording percentage difference
+bcbio.dragennative.counts <- inner_join(bcbio.counts, dragen.counts.native, by = "gene") %>%
+  dplyr::mutate(percentageDiff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
+  dplyr::mutate_if(is.numeric, round,2)
+colnames(bcbio.dragennative.counts) <- c("gene", "bcbio", "dragen_native", "percentageDiff") 
 
 #get genes annotation from ensembl IDs 
-edb <- EnsDb.Hsapiens.v75
+edb <- EnsDb.Hsapiens.v86
 #get keytypes for gene SYMBOL
 keys <- keys(edb, keytype="GENEID")
 #get genes genomic coordiantes
@@ -190,6 +202,13 @@ gene_info = gene_info[!duplicated(gene_info$geneName),]
 
 #annotate the counts dataframe to include gene names
 bcbio.dragen.gene.counts <- inner_join(bcbio.dragen.counts, gene_info, by = "gene") %>%
+  dplyr::arrange(-percentageDiff) %>%
+  dplyr::select(geneName, everything()) %>%
+  #remove part of genenames after .
+  dplyr::mutate(geneName=sapply(strsplit(geneName, split = '.', fixed = TRUE), function(x) (x[1])))
+
+#annotate the dragen native counts dataframe to include gene names
+bcbio.dragennative.gene.counts <- inner_join(bcbio.dragennative.counts, gene_info, by = "gene") %>%
   dplyr::arrange(-percentageDiff) %>%
   dplyr::select(geneName, everything()) %>%
   #remove part of genenames after .
@@ -224,15 +243,31 @@ ggplot(bcbio.dragen.gene.counts,
          annotate("text", x=15, y=20, label= paste("spearman cor = ", round(cor.gene$estimate, 2))) +
          ggtitle("Per gene counts correlation between bcbio-kallisto and dragen")
 
+cor.gene.dragennative = cor.test(log2(bcbio.dragennative.gene.counts$bcbio+1),
+                                 log2(bcbio.dragennative.gene.counts$dragen_native+1), method = 'spearman')
+ggplot(bcbio.dragennative.gene.counts, 
+       aes(x=log2(bcbio.dragennative.gene.counts$bcbio+1), y=log2(bcbio.dragennative.gene.counts$dragen_native+1))) +
+         geom_point() +
+         geom_smooth(method = "lm") +
+         geom_abline(slope=1, intercept = 0, color="red") +
+         annotate("text", x=15, y=20, label= paste("spearman cor = ", round(cor.gene.dragennative$estimate, 2))) +
+         ggtitle("Per gene counts correlation between bcbio-kallisto and dragen native output")
+
 #summarize percentage difference between counts
 transcripts.counts.summary <- summary(est.counts$percentage_counts_diff)
 genes.count.summary <- summary(bcbio.dragen.gene.counts$percentageDiff)
+genes.count.summary.dragennative <-  summary(bcbio.dragennative.gene.counts$percentageDiff)
 
 #display results only where we have %diff above a certain threshold (using values above third quantile) for gene level counts
 bcbio.dragen.gene.counts.filtered <- bcbio.dragen.gene.counts %>%
   dplyr::filter(percentageDiff > quantile(bcbio.dragen.gene.counts$percentageDiff, na.rm = TRUE)[3])
 
+bcbio.dragennative.gene.counts.filtered <- bcbio.dragennative.gene.counts %>%
+  dplyr::filter(percentageDiff > quantile(bcbio.dragennative.gene.counts$percentageDiff, na.rm = TRUE)[3])
+
 datatable(bcbio.dragen.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered gene counts (values above third quantile)")
+
+datatable(bcbio.dragennative.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered dragen native gene counts (values above third quantile)")
 
 #generate interactive density plot
 plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2(dragen+1), type = 'scatter', color = ~percentageDiff,
@@ -241,13 +276,26 @@ plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2
                               '<br /> bcbioCounts: ', bcbio, 
                               '<br /> dragenCounts: ', dragen),
                 hoverinfo = 'text') %>% 
-  layout(title="Density plot for filtered counts - %age difference above third quantile")
+  layout(title="Density plot for filtered counts <br> %age difference above third quantile")
+
+plotly::plot_ly(bcbio.dragennative.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2(dragen_native+1), type = 'scatter', color = ~percentageDiff,
+                mode= 'markers',
+                text = ~paste('geneName:', geneName, 
+                              '<br /> bcbioCounts: ', bcbio, 
+                              '<br /> dragenNativeCounts: ', dragen_native),
+                hoverinfo = 'text') %>% 
+  layout(title="Density plot for filtered dragen native gene counts <br> %age difference above third quantile")
 
 # subset the filtered counts to the genes in UMCCR cancer gene list
 bcbio.dragen.gene.counts.filtered.umccr <- bcbio.dragen.gene.counts.filtered %>%
   dplyr::filter(geneName %in% umccr.cancer.genes$symbol)
 
 datatable(bcbio.dragen.gene.counts.filtered.umccr, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered gene counts that exist in UMCCR cancer gene list")
+
+bcbio.dragennative.gene.counts.filtered.umccr <- bcbio.dragennative.gene.counts.filtered %>%
+  dplyr::filter(geneName %in% umccr.cancer.genes$symbol)
+
+datatable(bcbio.dragennative.gene.counts.filtered.umccr, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered dragen native gene counts that exist in UMCCR cancer gene list")
 
 #generate interactive density plot
 
@@ -257,7 +305,16 @@ plotly::plot_ly(bcbio.dragen.gene.counts.filtered.umccr, x = ~log2(bcbio+1), y =
                               '<br /> bcbioCounts: ', bcbio, 
                               '<br /> dragenCounts: ', dragen),
                 hoverinfo = 'text') %>% 
-  layout(title="Density plot for filtered counts (genes present in cancer gene list)")
+  layout(title="Density plot for filtered counts <br>Genes present in cancer gene list")
+
+plotly::plot_ly(bcbio.dragennative.gene.counts.filtered.umccr, x = ~log2(bcbio+1), y = ~log2(dragen_native+1), type = 'scatter', color = ~percentageDiff,
+                mode= 'markers',
+                text = ~paste('geneName:', geneName, 
+                              '<br /> bcbioCounts: ', bcbio, 
+                              '<br /> dragenNativeCounts: ', dragen_native),
+                hoverinfo = 'text') %>% 
+  layout(title="Density plot for filtered counts <br>Native dragen output genes present in cancer gene list")
+
 ```
 
 ### TPMs
