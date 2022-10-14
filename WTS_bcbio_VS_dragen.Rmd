@@ -13,8 +13,8 @@ output:
   rmdformats::material:
     highlight: kate
 params:
-  run_1: '/Users/kanwals/UMCCR/data/projects/WTS_comparison/SBJ02097/dragen/'
-  run_2: '/Users/kanwals/UMCCR/data/projects/WTS_comparison/SBJ02097/bcbio/'
+  run_1: '/Users/kanwals/UMCCR/data/projects/WTS_comparison/SBJ02407/dragen/'
+  run_2: '/Users/kanwals/UMCCR/data/projects/WTS_comparison/SBJ02407/bcbio/'
 ---
 
 # Description
@@ -24,7 +24,7 @@ div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
 </style>
 <div class = "blue">
 
-**SAMPLE: SBJ02097**
+**SAMPLE: SBJ02407**
 
 For each WTS workflow output type (abundance and fusions for now), the document currently reports:
 
@@ -129,9 +129,9 @@ This section summarizes two key factors:
 ```{r input-counts, message=FALSE, warning=FALSE}
 ###Start with the simple line count in the files i.e. the number of entries in the output from both runs is same.
 #compare the count files first (from both runs)
-counts.dragen <- read.table(here("../../data/projects/WTS_comparison/SBJ02097/dragen/PRJ221038.quant.sf"), sep="\t", as.is=TRUE, header=TRUE)
-counts.dragen.gene <- read.table(here("../../data/projects/WTS_comparison/SBJ02097/dragen/PRJ221038.quant.genes.sf"), sep="\t", as.is=TRUE, header=TRUE)
-counts.bcbio <-  read.table(here("../../data/projects/WTS_comparison/SBJ02097/bcbio/abundance.tsv"), sep="\t", as.is=TRUE, header=TRUE)
+counts.dragen <- read.table(here("../../data/projects/WTS_comparison/SBJ02407/dragen/PRJ221346.quant.sf"), sep="\t", as.is=TRUE, header=TRUE)
+counts.dragen.gene <- read.table(here("../../data/projects/WTS_comparison/SBJ02407/dragen/PRJ221346.quant.genes.sf"), sep="\t", as.is=TRUE, header=TRUE)
+counts.bcbio <-  read.table(here("../../data/projects/WTS_comparison/SBJ02407/bcbio/abundance.tsv"), sep="\t", as.is=TRUE, header=TRUE)
 
 #read in the tximport data
 dir <- here("../../data/projects/WTS_comparison")
@@ -160,8 +160,8 @@ colnames(counts.dragen) <-  c("target_id", "length", "eff_length", "tpm", "est_c
 counts.dragen <- counts.dragen[, c(1, 2, 3, 5, 4)]
 
 #extract gene level counts using tximport
-txi.bcbio <- tximport(here('../../data/projects/WTS_comparison/SBJ02097/bcbio/abundance.tsv'), type = "kallisto", tx2gene = tx2ensembl)
-txi.dragen <- tximport(here('../../data/projects/WTS_comparison/SBJ02097/dragen/PRJ221038.quant.sf'), type = "salmon", tx2gene = tx2ensembl)
+txi.bcbio <- tximport(here('../../data/projects/WTS_comparison/SBJ02407/bcbio/abundance.tsv'), type = "kallisto", tx2gene = tx2ensembl)
+txi.dragen <- tximport(here('../../data/projects/WTS_comparison/SBJ02407/dragen/PRJ221346.quant.sf'), type = "salmon", tx2gene = tx2ensembl)
 
 #extract counts to prepare dataframe
 bcbio.counts <- as.data.frame(txi.bcbio$counts) %>%
@@ -189,6 +189,12 @@ bcbio.dragennative.counts <- inner_join(bcbio.counts, dragen.counts.native, by =
   dplyr::mutate_if(is.numeric, round,2)
 colnames(bcbio.dragennative.counts) <- c("gene", "bcbio", "dragen_native", "percentageDiff") 
 
+#merge the calls from dragen-salmon-to-gene using txi and dragen native gene count estimation - also add a column for recording percentage difference
+dragen.dragennative.counts <- inner_join(dragen.counts, dragen.counts.native, by = "gene") %>%
+  dplyr::mutate(percentageDiff = ifelse(count.x > count.y, (count.x - count.y)/count.x *100, (count.y - count.x)/count.y *100)) %>%
+  dplyr::mutate_if(is.numeric, round,2)
+colnames(dragen.dragennative.counts) <- c("gene", "dragen_txi", "dragen_native", "percentageDiff") 
+
 #get genes annotation from ensembl IDs 
 edb <- EnsDb.Hsapiens.v86
 #get keytypes for gene SYMBOL
@@ -209,6 +215,13 @@ bcbio.dragen.gene.counts <- inner_join(bcbio.dragen.counts, gene_info, by = "gen
 
 #annotate the dragen native counts dataframe to include gene names
 bcbio.dragennative.gene.counts <- inner_join(bcbio.dragennative.counts, gene_info, by = "gene") %>%
+  dplyr::arrange(-percentageDiff) %>%
+  dplyr::select(geneName, everything()) %>%
+  #remove part of genenames after .
+  dplyr::mutate(geneName=sapply(strsplit(geneName, split = '.', fixed = TRUE), function(x) (x[1])))
+
+#annotate the dragen-dragennative counts dataframe to include gene names
+dragen.dragennative.gene.counts <- inner_join(dragen.dragennative.counts, gene_info, by = "gene") %>%
   dplyr::arrange(-percentageDiff) %>%
   dplyr::select(geneName, everything()) %>%
   #remove part of genenames after .
@@ -243,6 +256,7 @@ ggplot(bcbio.dragen.gene.counts,
          annotate("text", x=15, y=20, label= paste("spearman cor = ", round(cor.gene$estimate, 2))) +
          ggtitle("Per gene counts correlation between bcbio-kallisto and dragen")
 
+#Per gene counts correlation between bcbio-kallisto-to-gene and dragen-native-gene
 cor.gene.dragennative = cor.test(log2(bcbio.dragennative.gene.counts$bcbio+1),
                                  log2(bcbio.dragennative.gene.counts$dragen_native+1), method = 'spearman')
 ggplot(bcbio.dragennative.gene.counts, 
@@ -252,6 +266,17 @@ ggplot(bcbio.dragennative.gene.counts,
          geom_abline(slope=1, intercept = 0, color="red") +
          annotate("text", x=15, y=20, label= paste("spearman cor = ", round(cor.gene.dragennative$estimate, 2))) +
          ggtitle("Per gene counts correlation between bcbio-kallisto and dragen native output")
+
+#Per gene counts correlation between dragen-txi and dragen-native outputs
+cor.gene.dragentxi.dragennative = cor.test(log2(dragen.dragennative.gene.counts$dragen_txi+1),
+                                 log2(dragen.dragennative.gene.counts$dragen_native+1), method = 'spearman')
+ggplot(dragen.dragennative.gene.counts, 
+       aes(x=log2(dragen.dragennative.gene.counts$dragen_txi+1), y=log2(dragen.dragennative.gene.counts$dragen_native+1))) +
+         geom_point() +
+         geom_smooth(method = "lm") +
+         geom_abline(slope=1, intercept = 0, color="red") +
+         annotate("text", x=15, y=20, label= paste("spearman cor = ", round(cor.gene.dragentxi.dragennative$estimate, 2))) +
+         ggtitle("Per gene counts correlation between dragen-txi and dragen native output")
 
 #summarize percentage difference between counts
 transcripts.counts.summary <- summary(est.counts$percentage_counts_diff)
@@ -265,9 +290,14 @@ bcbio.dragen.gene.counts.filtered <- bcbio.dragen.gene.counts %>%
 bcbio.dragennative.gene.counts.filtered <- bcbio.dragennative.gene.counts %>%
   dplyr::filter(percentageDiff > quantile(bcbio.dragennative.gene.counts$percentageDiff, na.rm = TRUE)[3])
 
+dragen.dragennative.gene.counts.filtered <- dragen.dragennative.gene.counts %>%
+  dplyr::filter(percentageDiff > quantile(dragen.dragennative.gene.counts$percentageDiff, na.rm = TRUE)[3])
+
 datatable(bcbio.dragen.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered gene counts (values above third quantile)")
 
 datatable(bcbio.dragennative.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered dragen native gene counts (values above third quantile)")
+
+datatable(dragen.dragennative.gene.counts.filtered, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered dragen txi & dragen native gene counts (values above third quantile)")
 
 #generate interactive density plot
 plotly::plot_ly(bcbio.dragen.gene.counts.filtered, x = ~log2(bcbio+1), y = ~log2(dragen+1), type = 'scatter', color = ~percentageDiff,
@@ -297,6 +327,9 @@ bcbio.dragennative.gene.counts.filtered.umccr <- bcbio.dragennative.gene.counts.
 
 datatable(bcbio.dragennative.gene.counts.filtered.umccr, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T), caption = "Filtered dragen native gene counts that exist in UMCCR cancer gene list")
 
+dragen.dragennative.gene.counts.filtered.umccr <- dragen.dragennative.gene.counts.filtered %>%
+  dplyr::filter(geneName %in% umccr.cancer.genes$symbol)
+
 #generate interactive density plot
 
 plotly::plot_ly(bcbio.dragen.gene.counts.filtered.umccr, x = ~log2(bcbio+1), y = ~log2(dragen+1), type = 'scatter', color = ~percentageDiff,
@@ -314,6 +347,14 @@ plotly::plot_ly(bcbio.dragennative.gene.counts.filtered.umccr, x = ~log2(bcbio+1
                               '<br /> dragenNativeCounts: ', dragen_native),
                 hoverinfo = 'text') %>% 
   layout(title="Density plot for filtered counts <br>Native dragen output genes present in cancer gene list")
+
+plotly::plot_ly(dragen.dragennative.gene.counts.filtered.umccr, x = ~log2(dragen_txi+1), y = ~log2(dragen_native+1), type = 'scatter', color = ~percentageDiff,
+                mode= 'markers',
+                text = ~paste('geneName:', geneName, 
+                              '<br /> dragentxiCounts: ', dragen_txi, 
+                              '<br /> dragenNativeCounts: ', dragen_native),
+                hoverinfo = 'text') %>% 
+  layout(title="Density plot for filtered counts <br>Dragen txi and dragen native output genes present in cancer gene list")
 
 ```
 
@@ -341,16 +382,16 @@ This section includes a summary of:
 - a table outlining difference between both runs.
   - The fields checked are fusion gene names.
   
-```{r input-fusions, message=FALSE, warning=FALSE}
+```{r input-fusions, message=FALSE, warning=FALSE, eval=FALSE}
 ###compare the fusion calls (from both runs)
-fusions.bcbio.arriba <- read.table(here("../../data/projects/WTS_comparison/SBJ02097/bcbio/fusions.tsv"), sep="\t", as.is=TRUE, header=FALSE, fill = TRUE)
+fusions.bcbio.arriba <- read.table(here("../../data/projects/WTS_comparison/SBJ02407/bcbio/fusions.tsv"), sep="\t", as.is=TRUE, header=FALSE, fill = TRUE)
 colnames(fusions.bcbio.arriba) <- c("gene1", "gene2", "strand1(gene/fusion)", "strand2(gene/fusion)", "breakpoint1", "breakpoint", "site1", "site2", "type", "direction1", "direction2", "split_reads1", "split_reads2", "discordant_mates", "coverage1", "coverage2", "confidence", "closest_genomic_breakpoint1", "closest_genomic_breakpoint2", "filters", "fusion_transcript", "reading_frame", "peptide_sequence", "read_identifiers")
-fusions.dragen.arriba <- read.table(here("../../data/projects/WTS_comparison/SBJ02097/dragen/fusions.tsv"), sep="\t", as.is=TRUE, header=FALSE, fill = TRUE)
+fusions.dragen.arriba <- read.table(here("../../data/projects/WTS_comparison/SBJ02407/dragen/fusions.tsv"), sep="\t", as.is=TRUE, header=FALSE, fill = TRUE)
 colnames(fusions.dragen.arriba) <- c("gene1", "gene2", "strand1(gene/fusion)", "strand2(gene/fusion)", "breakpoint1", "breakpoint2", "site1", "site2", "type", "split_reads1", "split_reads2", "discordant_mates", "coverage1", "coverage2", "confidence", "reading_frame", "tags", "retained_protein_domains", "closest_genomic_breakpoint1", "closest_genomic_breakpoint2", "gene_id1", "gene_id2", "transcript_id1", "transcript_id2", "direction1", "direction2", "filters", "fusion_transcript", "peptide_sequence", "read_identifiers")
 ```
 
 
-```{r diff-fusions, message=FALSE, warning=FALSE}
+```{r diff-fusions, message=FALSE, warning=FALSE, eval=FALSE}
 ###find common fusion gene pairs between both arriba and dragen. Return all rows from x where there are matching values in y, and all columns from x and y. If there are multiple matches between x and y, all combination of the matches are returned.
 fusions.common <- inner_join(fusions.bcbio.arriba, fusions.dragen.arriba, by = c("gene1", "gene2"), suffix = c(".bcbio", ".dragen"),)
 
@@ -361,7 +402,7 @@ fusions.diff.dragen <- anti_join(fusions.dragen.arriba, fusions.bcbio.arriba, by
 
 ### Fusions Summary
 
-```{r summary-fusions, message=FALSE, warning=FALSE, echo =FALSE}
+```{r summary-fusions, message=FALSE, warning=FALSE, echo =FALSE, eval=FALSE}
 fusions.total <- data.frame(c("bcbio-arriba", "dragen-arriba"), c(nrow(fusions.bcbio.arriba), nrow(fusions.dragen.arriba)))
 colnames(fusions.total) <- c("pipeline", "total_fusions")
 datatable(fusions.total, rownames = TRUE, options = list(sDom  = '<"top">lrt<"bottom">ip'))
