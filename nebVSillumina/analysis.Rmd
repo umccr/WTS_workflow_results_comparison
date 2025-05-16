@@ -1,0 +1,244 @@
+---
+title: "WTS - Quantification Result Comparison"
+date: "`r format(Sys.time(), '%a %Y-%b-%d')`"
+output:
+  html_document:
+    keep_md: yes
+    css: style.css
+    theme: readable
+    toc: true
+    toc_float: true
+    code_folding: hide
+  rmdformats::material:
+    highlight: kate
+params:
+  run_1: '~/UMCCR/research/projects/nebVSillumina/SBJ03118/neb'
+  run_2: '~/UMCCR/research/projects/nebVSillumina/SBJ03118/illumina'
+---
+
+## Introduction
+
+<div class = "blue">
+This document compares WTS workflow abundance outputs, reporting:
+
+- File names in the input (params) directories
+- The number and comparison of calls
+- Key differences between both outputs in a tabular format
+</div>
+
+
+## List files
+
+This section lists the file names for outputs in the run directories being compared in this report.  
+
+```{r read_data, message=FALSE, warning=FALSE}
+###Read input. 
+###The script expects two input directories, each containing 'final' results as produced by bcbio. The results in these two input directories will be compared.
+run_1 <-file.path(params$run_1)
+#list files in the first run directory
+list.files(run_1)
+
+run_2 <- file.path(params$run_2)
+#list files in the second run directory
+list.files(run_2)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# Load required libraries
+library(tools)
+library(here)
+library(DT)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(gridExtra)
+library(tximport)
+library(ggpubr)
+library(tidyr)
+```
+
+```{r funcs, include=FALSE}
+# Function to find and read quant.genes.sf file
+read_quant_file <- function(dir) {
+  file <- list.files(dir, pattern = "quant.genes.sf$", recursive = TRUE, full.names = TRUE)
+  if (length(file) == 0) stop("No quant.genes.sf file found in ", dir)
+  data <- read.table(file[1], sep="\t", as.is=TRUE, header=TRUE)
+  data$Name <- sub("\\..*", "", data$Name)
+  return(data)
+}
+```
+
+## Data Preparation
+
+```{r input-counts, message=FALSE, warning=FALSE}
+# Read in the data
+counts_1 <- read_quant_file(params$run_1)
+counts_2 <- read_quant_file(params$run_2)
+
+# Create variable names from file names
+var_name_1 <- tools::file_path_sans_ext(basename(list.files(params$run_1, pattern = "quant.genes.sf$", recursive = TRUE)[1]))
+var_name_2 <- tools::file_path_sans_ext(basename(list.files(params$run_2, pattern = "quant.genes.sf$", recursive = TRUE)[1]))
+
+# Assign to dynamically named variables
+assign(var_name_1, counts_1)
+assign(var_name_2, counts_2)
+
+# Remove version numbers from gene names
+counts_1$Name <- sub("\\..*", "", counts_1$Name)
+counts_2$Name <- sub("\\..*", "", counts_2$Name)
+
+# Join the datasets
+neb.ilumina.counts <- inner_join(counts_1, counts_2 , by = "Name", suffix = c("_neb", "_illumina")) %>%
+  dplyr::mutate(percentageDiff = ifelse(TPM_neb > TPM_illumina, (TPM_neb - TPM_illumina)/((TPM_neb + TPM_illumina)/2) *100, (TPM_illumina - TPM_neb)/((TPM_neb + TPM_illumina)/2) *100)) %>%
+  dplyr::mutate_if(is.numeric, round,2)
+
+# Load gene names
+tx_gene_id_105_rds <- system.file("extdata/ensembl/tx_gene_id_105.rds", package = "RNAsum.data")
+tx_gene_id_105 <- readr::read_rds(tx_gene_id_105_rds) %>%
+  dplyr::select(GENEID, GENENAME) %>%
+  dplyr::rename(NAME = GENEID)
+tx_gene_id_105_unique <- tx_gene_id_105 %>%
+  distinct(NAME, .keep_all = TRUE)
+
+# Prepare the main dataset
+est.counts <- neb.ilumina.counts[, c('Name', 'TPM_neb', 'TPM_illumina', 'percentageDiff')] %>%
+  left_join(tx_gene_id_105_unique, by = c("Name" = "NAME")) %>%
+  dplyr::rename(Gene_name = GENENAME)
+
+# Filter data - keep difference above third quantile and remove lowly expressed genes
+est.counts.filtered <- est.counts %>%
+  filter(!is.na(percentageDiff)) %>%  # Remove NA values before calculating quantile
+  filter(percentageDiff > quantile(percentageDiff, 0.75, na.rm = TRUE)) %>%
+  filter(TPM_neb > 1 | TPM_illumina > 1)
+```
+
+## Analysis Results
+
+### Total Gene Counts
+
+#### Summary Table
+
+```{r summary, message=FALSE, warning=FALSE}
+lines.count <- data.frame(c("NEB", "ILLUMINA"), c(nrow(counts_1), nrow(counts_2)))
+colnames(lines.count) <- c("assay", "lines_count")
+datatable(lines.count, rownames = TRUE, options = list(sDom = '<"top">lrt<"bottom">ip'))
+```
+
+### Gene Expression Correlation
+
+#### Correlation Plot
+
+```{r cor, message=FALSE, warning=FALSE}
+cor.gene <- cor.test(log2(est.counts$TPM_neb + 1),
+                     log2(est.counts$TPM_illumina + 1),
+                     method = 'spearman')
+
+ggplot(est.counts,
+       aes(x = log2(TPM_neb + 1), y = log2(TPM_illumina + 1))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "red") +
+  stat_cor(method = "spearman", label.x = 0, label.y = 20) +
+  labs(title = "Per gene counts correlation between NEB and Illumina",
+       x = "log2(TPM_neb + 1)",
+       y = "log2(TPM_illumina + 1)") +
+  theme_minimal() +
+  coord_fixed(ratio = 1)
+```
+
+### TPM Distribution Analysis
+
+#### TPM Summary Statistics
+
+The large difference between the median (0.00) and mean (16.23) below indicates a highly skewed distribution of gene expression. A few genes are very highly expressed, while most genes have low or no expression.
+
+Given that 75% of genes have TPM ≤ 1.13, a TPM threshold (1 TPM) was used to filter out lowly expressed genes.
+
+Also, the data is log-transformed for analyses and visualizations to better handle the wide dynamic range.
+
+```{r sum-stats, message=FALSE, warning=FALSE}
+summary_neb <- summary(est.counts$TPM_neb)
+summary_illumina <- summary(est.counts$TPM_illumina)
+
+summary_stats <- data.frame(
+  Statistic = names(summary_neb),
+  TPM_neb = as.numeric(summary_neb),
+  TPM_illumina = as.numeric(summary_illumina)
+) %>%
+  mutate(across(where(is.numeric), ~round(., 2)))
+
+datatable(summary_stats,
+          options = list(
+            pageLength = 6,
+            dom = 't',
+            ordering = FALSE
+          ),
+          rownames = FALSE,
+          caption = "Summary Statistics of TPM Values") %>%
+  formatStyle(columns = c('TPM_neb', 'TPM_illumina'),
+              backgroundColor = styleInterval(c(1, 10, 100),
+                                              c('white', '#f7f7f7', '#e7e7e7', '#d7d7d7')))
+```
+
+#### TPM Distribution Plots
+
+```{r tpm, message=FALSE, warning=FALSE}
+# Create visualisation
+threshold <- 1
+
+# Prepare the data
+plot_data <- est.counts.filtered %>%
+  select(TPM_neb, TPM_illumina) %>%
+  pivot_longer(cols = c(TPM_neb, TPM_illumina), names_to = "TPM_type", values_to = "TPM_value")
+
+# Create the plot
+ggplot(plot_data, aes(x = log2(TPM_value))) +
+  geom_histogram(bins = 80, fill = "skyblue", color = "black") +
+  scale_x_continuous(limits = c(0, 12)) +
+  facet_wrap(~ TPM_type, scales = "free_y", ncol = 2) +
+  labs(title = "Distribution of log2(TPM) for Filtered Data (TPM > 1)",
+       x = "log2(TPM)",
+       y = "Count") +
+  theme_minimal() +
+  theme(strip.background = element_rect(fill = "lightgray"),
+        strip.text = element_text(face = "bold"))
+```
+
+#### Display filtered data (TPM >1) and TPM scatter plot
+
+```{r tpm-scatter, message=FALSE, warning=FALSE}
+# Display filtered data
+datatable(est.counts.filtered, 
+          rownames = FALSE, 
+          filter = "top", 
+          options = list(pageLength = 10, scrollX = TRUE), 
+          caption = "Filtered gene counts (values above third quartile)")
+
+p <- plot_ly(est.counts.filtered, 
+             x = ~log2(TPM_neb + 1), 
+             y = ~log2(TPM_illumina + 1), 
+             type = 'scatter', 
+             mode = 'markers',
+             color = ~percentageDiff,
+             colors = colorRamp(c("blue", "white", "red")),
+             marker = list(
+               colorbar = list(title = "% Difference"),
+               colorscale = 'RdBu',
+               cmin = 50,
+               cmid = 100,
+               cmax = 200
+             ),
+             text = ~paste('Gene Name:', Gene_name, 
+                           '<br>Neb TPM:', round(TPM_neb, 2), 
+                           '<br>Illumina TPM:', round(TPM_illumina, 2),
+                           '<br>Percentage Diff:', round(percentageDiff, 2)),
+             hoverinfo = 'text') %>% 
+  layout(title = "Scatter plot for filtered counts<br>Percentage difference above third quartile",
+         xaxis = list(title = "log2(TPM_neb + 1)"),
+         yaxis = list(title = "log2(TPM_illumina + 1)"))
+
+# Display plot
+p
+```
+
