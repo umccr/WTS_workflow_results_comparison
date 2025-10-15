@@ -168,9 +168,9 @@ ggplot(est.counts,
 
 #### TPM Summary Statistics
 
-The large difference between the median (0.00) and mean (16.23) below indicates a highly skewed distribution of gene expression. A few genes are very highly expressed, while most genes have low or no expression.
+The large difference between the median and mean below indicates a highly skewed distribution of gene expression. A few genes are very highly expressed, while most genes have low or no expression.
 
-Given that 75% of genes have TPM ≤ 1.13, a TPM threshold (1 TPM) was used to filter out lowly expressed genes.
+Third quarile value was used as a TPM threshold to filter out lowly expressed genes as 75% of genes have TPM ≤ to this value.
 
 Also, the data is log-transformed for analyses and visualizations to better handle the wide dynamic range.
 
@@ -231,7 +231,7 @@ ggplot(plot_data, aes(x = log2(TPM_value))) +
         strip.text = element_text(face = "bold"))
 ```
 
-#### Display filtered data (TPM >1) and TPM scatter plot
+#### Display filtered data (TPM > 1) and TPM scatter plot
 
 ```{r tpm-scatter, message=FALSE, warning=FALSE}
 # Display filtered data
