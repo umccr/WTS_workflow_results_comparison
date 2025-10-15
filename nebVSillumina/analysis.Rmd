@@ -241,4 +241,3 @@ p <- plot_ly(est.counts.filtered,
 # Display plot
 p
 ```
-
